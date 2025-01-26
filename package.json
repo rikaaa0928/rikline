@@ -1,6 +1,6 @@
 {
-	"name": "rikaline",
-	"displayName": "Rikaline",
+	"name": "rikline",
+	"displayName": "rikline",
 	"description": "Autonomous coding agent right in your IDE, capable of creating/editing files, running commands, using the browser, and more with your permission every step of the way.",
 	"version": "0.0.1",
 	"icon": "assets/icons/icon.png",
@@ -49,17 +49,17 @@
 		"viewsContainers": {
 			"activitybar": [
 				{
-					"id": "rikaline-ActivityBar",
+					"id": "rikline-ActivityBar",
 					"title": "Cline",
 					"icon": "assets/icons/icon.svg"
 				}
 			]
 		},
 		"views": {
-			"rikaline-ActivityBar": [
+			"rikline-ActivityBar": [
 				{
 					"type": "webview",
-					"id": "rikaline.SidebarProvider",
+					"id": "rikline.SidebarProvider",
 					"name": ""
 				}
 			]
@@ -101,27 +101,27 @@
 				{
 					"command": "cline.plusButtonClicked",
 					"group": "navigation@1",
-					"when": "view == rikaline.SidebarProvider"
+					"when": "view == rikline.SidebarProvider"
 				},
 				{
 					"command": "cline.mcpButtonClicked",
 					"group": "navigation@2",
-					"when": "view == rikaline.SidebarProvider"
+					"when": "view == rikline.SidebarProvider"
 				},
 				{
 					"command": "cline.historyButtonClicked",
 					"group": "navigation@3",
-					"when": "view == rikaline.SidebarProvider"
+					"when": "view == rikline.SidebarProvider"
 				},
 				{
 					"command": "cline.popoutButtonClicked",
 					"group": "navigation@4",
-					"when": "view == rikaline.SidebarProvider"
+					"when": "view == rikline.SidebarProvider"
 				},
 				{
 					"command": "cline.settingsButtonClicked",
 					"group": "navigation@5",
-					"when": "view == rikaline.SidebarProvider"
+					"when": "view == rikline.SidebarProvider"
 				}
 			]
 		},

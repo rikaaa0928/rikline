@@ -1,5 +1,9 @@
-# Cline – \#1 on OpenRouter
+# Rikline – Cline with gemini baseurl
 
+# Diff with Cline
+* gemini with base url setting
+
+# Cline
 <p align="center">
   <img src="https://media.githubusercontent.com/media/cline/cline/main/assets/docs/demo.gif" width="100%" />
 </p>
