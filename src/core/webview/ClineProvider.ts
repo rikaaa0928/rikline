@@ -245,7 +245,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 
 	async initClineWithTask(task?: string, images?: string[]) {
 		await this.clearTask() // ensures that an exising task doesn't exist before starting a new one, although this shouldn't be possible since user must clear task before starting a new one
-		const { apiConfiguration, customInstructions, autoApprovalSettings, browserSettings, chatSettings } =
+		const { apiConfiguration, customInstructions, localeLanguage, autoApprovalSettings, browserSettings, chatSettings } =
 			await this.getState()
 		this.cline = new Cline(
 			this,
@@ -254,6 +254,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			browserSettings,
 			chatSettings,
 			customInstructions,
+			localeLanguage,
 			task,
 			images,
 		)
@@ -261,7 +262,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 
 	async initClineWithHistoryItem(historyItem: HistoryItem) {
 		await this.clearTask()
-		const { apiConfiguration, customInstructions, autoApprovalSettings, browserSettings, chatSettings } =
+		const { apiConfiguration, customInstructions, localeLanguage, autoApprovalSettings, browserSettings, chatSettings } =
 			await this.getState()
 		this.cline = new Cline(
 			this,
@@ -270,6 +271,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			browserSettings,
 			chatSettings,
 			customInstructions,
+			localeLanguage,
 			undefined,
 			undefined,
 			historyItem,
@@ -633,6 +635,9 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 					case "getLatestState":
 						await this.postStateToWebview()
 						break
+					case "subscribeEmail":
+						this.subscribeEmail(message.text)
+						break
 					case "accountLoginClicked": {
 						// Generate nonce for state validation
 						const nonce = crypto.randomBytes(32).toString("hex")
@@ -677,6 +682,10 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 						}
 						break
 					}
+					case "changeLanguage": {
+						await this.updateLocaleLanguage(message.text)
+						break
+					}
 					case "restartMcpServer": {
 						try {
 							await this.mcpHub?.restartConnection(message.text!)
@@ -686,7 +695,11 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 						break
 					}
 					case "openExtensionSettings": {
-						await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:rikaaa0928.rikline")
+						const settingsFilter = message.text || ""
+						await vscode.commands.executeCommand(
+							"workbench.action.openSettings",
+							`@ext:rikaaa0928.rikline ${settingsFilter}`.trim(), // trim whitespace if no settings filter
+						)
 						break
 					}
 					// Add more switch case statements here as more webview message commands
@@ -696,6 +709,36 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			null,
 			this.disposables,
 		)
+	}
+
+	async subscribeEmail(email?: string) {
+		if (!email) {
+			return
+		}
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+		if (!emailRegex.test(email)) {
+			vscode.window.showErrorMessage("Please enter a valid email address")
+			return
+		}
+		console.log("Subscribing email:", email)
+		this.postMessageToWebview({ type: "emailSubscribed" })
+		// Currently ignoring errors to this endpoint, but after accounts we'll remove this anyways
+		try {
+			const response = await axios.post(
+				"https://app.cline.bot/api/mailing-list",
+				{
+					email: email,
+				},
+				{
+					headers: {
+						"Content-Type": "application/json",
+					},
+				},
+			)
+			console.log("Email subscribed successfully. Response:", response.data)
+		} catch (error) {
+			console.error("Failed to subscribe email:", error)
+		}
 	}
 
 	async cancelTask() {
@@ -732,6 +775,14 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		await this.updateGlobalState("customInstructions", instructions || undefined)
 		if (this.cline) {
 			this.cline.customInstructions = instructions || undefined
+		}
+		await this.postStateToWebview()
+	}
+
+	async updateLocaleLanguage(language?: string) {
+		await this.updateGlobalState("localeLanguage", language || undefined)
+		if (this.cline) {
+			this.cline.localeLanguage = language || undefined
 		}
 		await this.postStateToWebview()
 	}
@@ -1150,6 +1201,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			browserSettings,
 			chatSettings,
 			userInfo,
+			localeLanguage,
 		} = await this.getState()
 
 		const authToken = await this.getSecret("authToken")
@@ -1166,7 +1218,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			autoApprovalSettings,
 			browserSettings,
 			chatSettings,
-			localeLanguage: vscode.env.language,
+			// FIXME: the vscode.env.language doesn't translate to the language specifiers we use in i18n. We need to know what values vscode uses and transform. For now this will always just lead to defaulting to English (see i18n.ts)
+			localeLanguage: localeLanguage || vscode.env.language,
 			isLoggedIn: !!authToken,
 			userInfo,
 		}
@@ -1351,6 +1404,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			autoApprovalSettings: autoApprovalSettings || DEFAULT_AUTO_APPROVAL_SETTINGS, // default value can be 0 or empty string
 			browserSettings: browserSettings || DEFAULT_BROWSER_SETTINGS,
 			chatSettings: chatSettings || DEFAULT_CHAT_SETTINGS,
+			localeLanguage,
 			userInfo,
 		}
 	}
