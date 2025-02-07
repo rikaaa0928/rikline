@@ -68,6 +68,7 @@ export const ExtensionStateContextProvider: React.FC<{
 							config.geminiBaseUrl,
 							config.openAiNativeApiKey,
 							config.deepSeekApiKey,
+							config.qwenApiKey,
 							config.mistralApiKey,
 							config.vsCodeLmModelSelector,
 						].some((key) => key !== undefined)
