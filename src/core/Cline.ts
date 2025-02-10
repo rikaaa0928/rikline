@@ -2452,8 +2452,21 @@ export class Cline {
 											})
 											.filter(Boolean)
 											.join("\n\n") || "(No response)"
-								await this.say("mcp_server_response", toolResultPretty)
-								pushToolResult(formatResponse.toolResult(toolResultPretty))
+								const images = toolResult?.content
+									.map((item) => {
+										if (item.type === "image") {
+											return `data:${item.mimeType};base64,${item.data}`
+										}
+										return ""
+									})
+									.filter((item) => item !== "")
+								await this.say("mcp_server_response", toolResultPretty, images)
+								if (toolResult?.isError) {
+									pushToolResult(formatResponse.toolResult(toolResultPretty))
+								} else {
+									pushToolResult(formatResponse.mcpToolResult(toolResult))
+								}
+
 								await this.saveCheckpoint()
 								break
 							}

@@ -1,6 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import * as path from "path"
 import * as diff from "diff"
+import { McpToolCallResponse } from "../../shared/mcp"
 
 export const formatResponse = {
 	toolDenied: () => `The user denied this operation.`,
@@ -40,6 +41,31 @@ Otherwise, if you have not completed the task and do not need additional informa
 		} else {
 			return text
 		}
+	},
+
+	mcpToolResult: (result?: McpToolCallResponse): Array<Anthropic.TextBlockParam | Anthropic.ImageBlockParam> => {
+		return (
+			result?.content.map((item) => {
+				if (item.type === "text") {
+					return item as Anthropic.TextBlockParam
+				}
+				if (item.type === "resource") {
+					const { blob, ...rest } = item.resource
+					return { type: "text", text: JSON.stringify(rest, null, 2) } as Anthropic.TextBlockParam
+				}
+				if (item.type === "image") {
+					return {
+						source: {
+							data: item.data,
+							media_type: item.mimeType,
+							type: "base64",
+						},
+						type: "image",
+					} as Anthropic.ImageBlockParam
+				}
+				return { type: "text", text: "" } as Anthropic.TextBlockParam
+			}) || [{ type: "text", text: "" } as Anthropic.TextBlockParam]
+		)
 	},
 
 	imageBlocks: (images?: string[]): Anthropic.ImageBlockParam[] => {
