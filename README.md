@@ -2,10 +2,12 @@
 English | <a href="https://github.com/cline/cline/blob/main/locales/es/README.md" target="_blank">Español</a> | <a href="https://github.com/cline/cline/blob/main/locales/de/README.md" target="_blank">Deutsch</a> | <a href="https://github.com/cline/cline/blob/main/locales/ja/README.md" target="_blank">日本語</a> | <a href="https://github.com/cline/cline/blob/main/locales/zh-cn/README.md" target="_blank">简体中文</a> | <a href="https://github.com/cline/cline/blob/main/locales/zh-tw/README.md" target="_blank">繁體中文</a>
 </sub></div>
 
-# Rikline – Cline with gemini baseurl
+# Rikline – Cline and more
 
 # Diff with Cline
 * gemini with base url setting
+* openrouter with base url setting
+* support for images returns in mcp tools
 
 # Cline
 <p align="center">
