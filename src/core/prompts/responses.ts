@@ -7,9 +7,6 @@ import { McpToolCallResponse } from "../../shared/mcp"
 export const formatResponse = {
 	toolDenied: () => `The user denied this operation.`,
 
-	toolDeniedWithFeedback: (feedback?: string) =>
-		`The user denied this operation and provided the following feedback:\n<feedback>\n${feedback}\n</feedback>`,
-
 	toolError: (error?: string) => `The tool execution failed with the following error:\n<error>\n${error}\n</error>`,
 
 	clineIgnoreError: (path: string) =>
