@@ -10,6 +10,7 @@ import * as vscode from "vscode"
 import { buildApiHandler } from "../../api"
 import { downloadTask } from "../../integrations/misc/export-markdown"
 import { openFile, openImage } from "../../integrations/misc/open-file"
+import { fetchOpenGraphData, isImageUrl } from "../../integrations/misc/link-preview"
 import { selectImages } from "../../integrations/misc/process-images"
 import { getTheme } from "../../integrations/theme/getTheme"
 import WorkspaceTracker from "../../integrations/workspace/WorkspaceTracker"
@@ -33,6 +34,7 @@ import { getNonce } from "./getNonce"
 import { getUri } from "./getUri"
 import { telemetryService } from "../../services/telemetry/TelemetryService"
 import { TelemetrySetting } from "../../shared/TelemetrySetting"
+import { validateThinkingBudget } from "../../utils/validation"
 
 /*
 https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/default/weather-webview/src/providers/WeatherViewProvider.ts
@@ -57,11 +59,14 @@ type SecretKey =
 	| "liteLlmApiKey"
 	| "authToken"
 	| "authNonce"
+	| "asksageApiKey"
+	| "xaiApiKey"
 type GlobalStateKey =
 	| "apiProvider"
 	| "apiModelId"
 	| "awsRegion"
 	| "awsUseCrossRegionInference"
+	| "awsBedrockUsePromptCache"
 	| "awsProfile"
 	| "awsUseProfile"
 	| "vertexProjectId"
@@ -88,6 +93,7 @@ type GlobalStateKey =
 	| "userInfo"
 	| "previousModeApiProvider"
 	| "previousModeModelId"
+	| "previousModeThinkingBudgetTokens"
 	| "previousModeModelInfo"
 	| "liteLlmBaseUrl"
 	| "liteLlmModelId"
@@ -96,6 +102,8 @@ type GlobalStateKey =
 	| "togetherModelId"
 	| "mcpMarketplaceCatalog"
 	| "telemetrySetting"
+	| "asksageApiUrl"
+	| "thinkingBudgetTokens"
 	| "geminiBaseUrl"
 
 export const GlobalFileNames = {
@@ -179,11 +187,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		return findLast(Array.from(this.activeInstances), (instance) => instance.view?.visible === true)
 	}
 
-	resolveWebviewView(
-		webviewView: vscode.WebviewView | vscode.WebviewPanel,
-		//context: vscode.WebviewViewResolveContext<unknown>, used to recreate a deallocated webview, but we don't need this since we use retainContextWhenHidden
-		//token: vscode.CancellationToken
-	): void | Thenable<void> {
+	async resolveWebviewView(webviewView: vscode.WebviewView | vscode.WebviewPanel) {
 		this.outputChannel.appendLine("Resolving webview view")
 		this.view = webviewView
 
@@ -192,7 +196,11 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			enableScripts: true,
 			localResourceRoots: [this.context.extensionUri],
 		}
-		webviewView.webview.html = this.getHtmlContent(webviewView.webview)
+
+		webviewView.webview.html =
+			this.context.extensionMode === vscode.ExtensionMode.Development
+				? await this.getHMRHtmlContent(webviewView.webview)
+				: this.getHtmlContent(webviewView.webview)
 
 		// Sets up an event listener to listen for messages passed from the webview view context
 		// and executes code based on the message that is received
@@ -343,9 +351,9 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		// then convert it to a uri we can use in the webview.
 
 		// The CSS file from the React build output
-		const stylesUri = getUri(webview, this.context.extensionUri, ["webview-ui", "build", "static", "css", "main.css"])
+		const stylesUri = getUri(webview, this.context.extensionUri, ["webview-ui", "build", "assets", "index.css"])
 		// The JS file from the React build output
-		const scriptUri = getUri(webview, this.context.extensionUri, ["webview-ui", "build", "static", "js", "main.js"])
+		const scriptUri = getUri(webview, this.context.extensionUri, ["webview-ui", "build", "assets", "index.js"])
 
 		// The codicon font from the React build output
 		// https://github.com/microsoft/vscode-extension-samples/blob/main/webview-codicons-sample/src/extension.ts
@@ -388,18 +396,92 @@ export class ClineProvider implements vscode.WebviewViewProvider {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
             <meta name="theme-color" content="#000000">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: data:; script-src 'nonce-${nonce}';">
             <link rel="stylesheet" type="text/css" href="${stylesUri}">
-			<link href="${codiconsUri}" rel="stylesheet" />
+            <link href="${codiconsUri}" rel="stylesheet" />
+						<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://*.posthog.com; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: data:; script-src 'nonce-${nonce}' https://*.posthog.com;">
             <title>Cline</title>
           </head>
           <body>
             <noscript>You need to enable JavaScript to run this app.</noscript>
             <div id="root"></div>
-            <script nonce="${nonce}" src="${scriptUri}"></script>
+            <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
           </body>
         </html>
       `
+	}
+
+	/**
+	 * Connects to the local Vite dev server to allow HMR, with fallback to the bundled assets
+	 *
+	 * @param webview A reference to the extension webview
+	 * @returns A template string literal containing the HTML that should be
+	 * rendered within the webview panel
+	 */
+	private async getHMRHtmlContent(webview: vscode.Webview): Promise<string> {
+		const localPort = 25463
+		const localServerUrl = `localhost:${localPort}`
+
+		// Check if local dev server is running.
+		try {
+			await axios.get(`http://${localServerUrl}`)
+		} catch (error) {
+			vscode.window.showErrorMessage(
+				"Cline: Local webview dev server is not running, HMR will not work. Please run 'npm run dev:webview' before launching the extension to enable HMR. Using bundled assets.",
+			)
+
+			return this.getHtmlContent(webview)
+		}
+
+		const nonce = getNonce()
+		const stylesUri = getUri(webview, this.context.extensionUri, ["webview-ui", "build", "assets", "index.css"])
+		const codiconsUri = getUri(webview, this.context.extensionUri, [
+			"node_modules",
+			"@vscode",
+			"codicons",
+			"dist",
+			"codicon.css",
+		])
+
+		const scriptEntrypoint = "src/main.tsx"
+		const scriptUri = `http://${localServerUrl}/${scriptEntrypoint}`
+
+		const reactRefresh = /*html*/ `
+			<script nonce="${nonce}" type="module">
+				import RefreshRuntime from "http://${localServerUrl}/@react-refresh"
+				RefreshRuntime.injectIntoGlobalHook(window)
+				window.$RefreshReg$ = () => {}
+				window.$RefreshSig$ = () => (type) => type
+				window.__vite_plugin_react_preamble_installed__ = true
+			</script>
+		`
+
+		const csp = [
+			"default-src 'none'",
+			`font-src ${webview.cspSource}`,
+			`style-src ${webview.cspSource} 'unsafe-inline' https://* http://${localServerUrl} http://0.0.0.0:${localPort}`,
+			`img-src ${webview.cspSource} https: data:`,
+			`script-src 'unsafe-eval' https://* http://${localServerUrl} http://0.0.0.0:${localPort} 'nonce-${nonce}'`,
+			`connect-src https://* ws://${localServerUrl} ws://0.0.0.0:${localPort} http://${localServerUrl} http://0.0.0.0:${localPort}`,
+		]
+
+		return /*html*/ `
+			<!DOCTYPE html>
+			<html lang="en">
+				<head>
+					<meta charset="utf-8">
+					<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+					<meta http-equiv="Content-Security-Policy" content="${csp.join("; ")}">
+					<link rel="stylesheet" type="text/css" href="${stylesUri}">
+					<link href="${codiconsUri}" rel="stylesheet" />
+					<title>Cline</title>
+				</head>
+				<body>
+					<div id="root"></div>
+					${reactRefresh}
+					<script type="module" src="${scriptUri}"></script>
+				</body>
+			</html>
+		`
 	}
 
 	/**
@@ -464,7 +546,6 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 							const isOptedIn = telemetrySetting === "enabled"
 							telemetryService.updateTelemetryState(isOptedIn)
 						})
-
 						break
 					case "newTask":
 						// Code that should run in response to the hello message command
@@ -489,6 +570,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 								awsSessionToken,
 								awsRegion,
 								awsUseCrossRegionInference,
+								awsBedrockUsePromptCache,
 								awsProfile,
 								awsUseProfile,
 								vertexProjectId,
@@ -521,6 +603,10 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 								liteLlmModelId,
 								liteLlmApiKey,
 								qwenApiLine,
+								asksageApiKey,
+								asksageApiUrl,
+								xaiApiKey,
+								thinkingBudgetTokens,
 							} = message.apiConfiguration
 							await this.updateGlobalState("apiProvider", apiProvider)
 							await this.updateGlobalState("apiModelId", apiModelId)
@@ -531,6 +617,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 							await this.storeSecret("awsSessionToken", awsSessionToken)
 							await this.updateGlobalState("awsRegion", awsRegion)
 							await this.updateGlobalState("awsUseCrossRegionInference", awsUseCrossRegionInference)
+							await this.updateGlobalState("awsBedrockUsePromptCache", awsBedrockUsePromptCache)
 							await this.updateGlobalState("awsProfile", awsProfile)
 							await this.updateGlobalState("awsUseProfile", awsUseProfile)
 							await this.updateGlobalState("vertexProjectId", vertexProjectId)
@@ -553,6 +640,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 							await this.storeSecret("qwenApiKey", qwenApiKey)
 							await this.storeSecret("mistralApiKey", mistralApiKey)
 							await this.storeSecret("liteLlmApiKey", liteLlmApiKey)
+							await this.storeSecret("xaiApiKey", xaiApiKey)
 							await this.updateGlobalState("azureApiVersion", azureApiVersion)
 							await this.updateGlobalState("openRouterModelId", openRouterModelId)
 							await this.updateGlobalState("openRouterModelInfo", openRouterModelInfo)
@@ -563,6 +651,9 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 							await this.updateGlobalState("qwenApiLine", qwenApiLine)
 							await this.updateGlobalState("requestyModelId", requestyModelId)
 							await this.updateGlobalState("togetherModelId", togetherModelId)
+							await this.storeSecret("asksageApiKey", asksageApiKey)
+							await this.updateGlobalState("asksageApiUrl", asksageApiUrl)
+							await this.updateGlobalState("thinkingBudgetTokens", thinkingBudgetTokens)
 							if (this.cline) {
 								this.cline.api = buildApiHandler(message.apiConfiguration)
 							}
@@ -668,6 +759,17 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 						break
 					case "openImage":
 						openImage(message.text!)
+						break
+					case "openInBrowser":
+						if (message.url) {
+							vscode.env.openExternal(vscode.Uri.parse(message.url))
+						}
+						break
+					case "fetchOpenGraphData":
+						this.fetchOpenGraphData(message.text!)
+						break
+					case "checkIsImageUrl":
+						this.checkIsImageUrl(message.text!)
 						break
 					case "openFile":
 						openFile(message.text!)
@@ -855,6 +957,16 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 						}
 						break
 					}
+					case "updateMcpTimeout": {
+						try {
+							if (message.serverName && message.timeout) {
+								await this.mcpHub?.updateServerTimeout(message.serverName, message.timeout)
+							}
+						} catch (error) {
+							console.error(`Failed to update timeout for server ${message.serverName}:`, error)
+						}
+						break
+					}
 					case "openExtensionSettings": {
 						const settingsFilter = message.text || ""
 						await vscode.commands.executeCommand(
@@ -897,15 +1009,18 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			previousModeApiProvider: newApiProvider,
 			previousModeModelId: newModelId,
 			previousModeModelInfo: newModelInfo,
+			previousModeThinkingBudgetTokens: newThinkingBudgetTokens,
 		} = await this.getState()
 
 		// Save the last model used in this mode
 		await this.updateGlobalState("previousModeApiProvider", apiConfiguration.apiProvider)
+		await this.updateGlobalState("previousModeThinkingBudgetTokens", apiConfiguration.thinkingBudgetTokens)
 		switch (apiConfiguration.apiProvider) {
 			case "anthropic":
 			case "bedrock":
 			case "vertex":
 			case "gemini":
+			case "asksage":
 				await this.updateGlobalState("previousModeModelId", apiConfiguration.apiModelId)
 				break
 			case "openrouter":
@@ -928,16 +1043,21 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			case "litellm":
 				await this.updateGlobalState("previousModeModelId", apiConfiguration.liteLlmModelId)
 				break
+			case "requesty":
+				await this.updateGlobalState("previousModeModelId", apiConfiguration.requestyModelId)
+				break
 		}
 
 		// Restore the model used in previous mode
 		if (newApiProvider && newModelId) {
 			await this.updateGlobalState("apiProvider", newApiProvider)
+			await this.updateGlobalState("thinkingBudgetTokens", newThinkingBudgetTokens)
 			switch (newApiProvider) {
 				case "anthropic":
 				case "bedrock":
 				case "vertex":
 				case "gemini":
+				case "asksage":
 					await this.updateGlobalState("apiModelId", newModelId)
 					break
 				case "openrouter":
@@ -959,6 +1079,9 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 					break
 				case "litellm":
 					await this.updateGlobalState("liteLlmModelId", newModelId)
+					break
+				case "requesty":
+					await this.updateGlobalState("requestyModelId", newModelId)
 					break
 			}
 
@@ -1060,21 +1183,38 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 
 	async getDocumentsPath(): Promise<string> {
 		if (process.platform === "win32") {
-			// If the user is running Win 7/Win Server 2008 r2+, we want to get the correct path to their Documents directory.
 			try {
 				const { stdout: docsPath } = await execa("powershell", [
 					"-NoProfile", // Ignore user's PowerShell profile(s)
 					"-Command",
 					"[System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::MyDocuments)",
 				])
-				return docsPath.trim()
+				const trimmedPath = docsPath.trim()
+				if (trimmedPath) {
+					return trimmedPath
+				}
 			} catch (err) {
 				console.error("Failed to retrieve Windows Documents path. Falling back to homedir/Documents.")
-				return path.join(os.homedir(), "Documents")
 			}
-		} else {
-			return path.join(os.homedir(), "Documents") // On POSIX (macOS, Linux, etc.), assume ~/Documents by default (existing behavior, but may want to implement similar logic here)
+		} else if (process.platform === "linux") {
+			try {
+				// First check if xdg-user-dir exists
+				await execa("which", ["xdg-user-dir"])
+
+				// If it exists, try to get XDG documents path
+				const { stdout } = await execa("xdg-user-dir", ["DOCUMENTS"])
+				const trimmedPath = stdout.trim()
+				if (trimmedPath) {
+					return trimmedPath
+				}
+			} catch {
+				// Log error but continue to fallback
+				console.error("Failed to retrieve XDG Documents path. Falling back to homedir/Documents.")
+			}
 		}
+
+		// Default fallback for all platforms
+		return path.join(os.homedir(), "Documents")
 	}
 
 	async ensureMcpServersDirectoryExists(): Promise<string> {
@@ -1465,6 +1605,7 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 						case "anthropic/claude-3-7-sonnet:beta":
 						case "anthropic/claude-3.7-sonnet":
 						case "anthropic/claude-3.7-sonnet:beta":
+						case "anthropic/claude-3.7-sonnet:thinking":
 						case "anthropic/claude-3.5-sonnet":
 						case "anthropic/claude-3.5-sonnet:beta":
 							// NOTE: this needs to be synced with api.ts/openrouter default model info
@@ -1581,8 +1722,11 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 	}
 
 	async deleteTaskWithId(id: string) {
+		console.info("deleteTaskWithId: ", id)
+
 		if (id === this.cline?.taskId) {
 			await this.clearTask()
+			console.debug("cleared task")
 		}
 
 		const { taskDirPath, apiConversationHistoryFilePath, uiMessagesFilePath } = await this.getTaskWithId(id)
@@ -1665,6 +1809,7 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			userInfo,
 			mcpMarketplaceEnabled,
 			telemetrySetting,
+			vscMachineId: vscode.env.machineId,
 		}
 	}
 
@@ -1730,6 +1875,7 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			awsSessionToken,
 			awsRegion,
 			awsUseCrossRegionInference,
+			awsBedrockUsePromptCache,
 			awsProfile,
 			awsUseProfile,
 			vertexProjectId,
@@ -1771,9 +1917,14 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			previousModeApiProvider,
 			previousModeModelId,
 			previousModeModelInfo,
+			previousModeThinkingBudgetTokens,
 			qwenApiLine,
 			liteLlmApiKey,
 			telemetrySetting,
+			asksageApiKey,
+			asksageApiUrl,
+			xaiApiKey,
+			thinkingBudgetTokens,
 		] = await Promise.all([
 			this.getGlobalState("apiProvider") as Promise<ApiProvider | undefined>,
 			this.getGlobalState("apiModelId") as Promise<string | undefined>,
@@ -1784,6 +1935,7 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			this.getSecret("awsSessionToken") as Promise<string | undefined>,
 			this.getGlobalState("awsRegion") as Promise<string | undefined>,
 			this.getGlobalState("awsUseCrossRegionInference") as Promise<boolean | undefined>,
+			this.getGlobalState("awsBedrockUsePromptCache") as Promise<boolean | undefined>,
 			this.getGlobalState("awsProfile") as Promise<string | undefined>,
 			this.getGlobalState("awsUseProfile") as Promise<boolean | undefined>,
 			this.getGlobalState("vertexProjectId") as Promise<string | undefined>,
@@ -1825,9 +1977,14 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			this.getGlobalState("previousModeApiProvider") as Promise<ApiProvider | undefined>,
 			this.getGlobalState("previousModeModelId") as Promise<string | undefined>,
 			this.getGlobalState("previousModeModelInfo") as Promise<ModelInfo | undefined>,
+			this.getGlobalState("previousModeThinkingBudgetTokens") as Promise<number | undefined>,
 			this.getGlobalState("qwenApiLine") as Promise<string | undefined>,
 			this.getSecret("liteLlmApiKey") as Promise<string | undefined>,
 			this.getGlobalState("telemetrySetting") as Promise<TelemetrySetting | undefined>,
+			this.getSecret("asksageApiKey") as Promise<string | undefined>,
+			this.getGlobalState("asksageApiUrl") as Promise<string | undefined>,
+			this.getSecret("xaiApiKey") as Promise<string | undefined>,
+			this.getGlobalState("thinkingBudgetTokens") as Promise<number | undefined>,
 		])
 
 		let apiProvider: ApiProvider
@@ -1861,6 +2018,7 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 				awsSessionToken,
 				awsRegion,
 				awsUseCrossRegionInference,
+				awsBedrockUsePromptCache,
 				awsProfile,
 				awsUseProfile,
 				vertexProjectId,
@@ -1891,9 +2049,13 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 				openRouterBaseUrl,
 				vsCodeLmModelSelector,
 				o3MiniReasoningEffort,
+				thinkingBudgetTokens,
 				liteLlmBaseUrl,
 				liteLlmModelId,
 				liteLlmApiKey,
+				asksageApiKey,
+				asksageApiUrl,
+				xaiApiKey,
 			},
 			lastShownAnnouncementId,
 			customInstructions,
@@ -1906,6 +2068,7 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			previousModeApiProvider,
 			previousModeModelId,
 			previousModeModelInfo,
+			previousModeThinkingBudgetTokens,
 			mcpMarketplaceEnabled,
 			telemetrySetting: telemetrySetting || "unset",
 		}
@@ -1967,6 +2130,53 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 		return await this.context.secrets.get(key)
 	}
 
+	// Open Graph Data
+
+	async fetchOpenGraphData(url: string) {
+		try {
+			// Use the fetchOpenGraphData function from link-preview.ts
+			const ogData = await fetchOpenGraphData(url)
+
+			// Send the data back to the webview
+			await this.postMessageToWebview({
+				type: "openGraphData",
+				openGraphData: ogData,
+				url: url,
+			})
+		} catch (error) {
+			console.error(`Error fetching Open Graph data for ${url}:`, error)
+			// Send an error response
+			await this.postMessageToWebview({
+				type: "openGraphData",
+				error: `Failed to fetch Open Graph data: ${error}`,
+				url: url,
+			})
+		}
+	}
+
+	// Check if a URL is an image
+	async checkIsImageUrl(url: string) {
+		try {
+			// Check if the URL is an image
+			const isImage = await isImageUrl(url)
+
+			// Send the result back to the webview
+			await this.postMessageToWebview({
+				type: "isImageUrlResult",
+				isImage,
+				url,
+			})
+		} catch (error) {
+			console.error(`Error checking if URL is an image: ${url}`, error)
+			// Send an error response
+			await this.postMessageToWebview({
+				type: "isImageUrlResult",
+				isImage: false,
+				url,
+			})
+		}
+	}
+
 	// dev
 
 	async resetState() {
@@ -1990,6 +2200,8 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			"mistralApiKey",
 			"liteLlmApiKey",
 			"authToken",
+			"asksageApiKey",
+			"xaiApiKey",
 		]
 		for (const key of secretKeys) {
 			await this.storeSecret(key, undefined)

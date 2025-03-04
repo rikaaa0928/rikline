@@ -10,3 +10,5 @@ tmp
 pnpm-lock.yaml
 
 .idea
+
+.clineignore
