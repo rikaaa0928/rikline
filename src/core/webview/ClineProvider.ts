@@ -1094,6 +1094,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			apiModelId,
 			apiKey,
 			openRouterApiKey,
+			openRouterBaseUrl,
 			awsAccessKey,
 			awsSecretKey,
 			awsSessionToken,
@@ -1115,6 +1116,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			lmStudioBaseUrl,
 			anthropicBaseUrl,
 			geminiApiKey,
+			geminiBaseUrl,
 			openAiNativeApiKey,
 			deepSeekApiKey,
 			requestyApiKey,
@@ -1141,6 +1143,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		await this.updateGlobalState("apiModelId", apiModelId)
 		await this.storeSecret("apiKey", apiKey)
 		await this.storeSecret("openRouterApiKey", openRouterApiKey)
+		await this.updateGlobalState("openRouterBaseUrl", openRouterBaseUrl)
 		await this.storeSecret("awsAccessKey", awsAccessKey)
 		await this.storeSecret("awsSecretKey", awsSecretKey)
 		await this.storeSecret("awsSessionToken", awsSessionToken)
@@ -1162,6 +1165,7 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		await this.updateGlobalState("lmStudioBaseUrl", lmStudioBaseUrl)
 		await this.updateGlobalState("anthropicBaseUrl", anthropicBaseUrl)
 		await this.storeSecret("geminiApiKey", geminiApiKey)
+		await this.updateGlobalState("geminiBaseUrl", geminiBaseUrl)
 		await this.storeSecret("openAiNativeApiKey", openAiNativeApiKey)
 		await this.storeSecret("deepSeekApiKey", deepSeekApiKey)
 		await this.storeSecret("requestyApiKey", requestyApiKey)
