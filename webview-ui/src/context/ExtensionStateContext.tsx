@@ -84,6 +84,7 @@ export const ExtensionStateContextProvider: React.FC<{
 							config.clineApiKey,
 							config.asksageApiKey,
 							config.xaiApiKey,
+							config.sambanovaApiKey,
 						].some((key) => key !== undefined)
 					: false
 				setShowWelcome(!hasKey)
