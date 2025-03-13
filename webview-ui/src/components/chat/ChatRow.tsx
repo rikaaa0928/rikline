@@ -812,6 +812,9 @@ export const ChatRowContent = ({ message, isExpanded, onToggleExpand, lastModifi
 									onToggleExpand={onToggleExpand}
 								/>
 							</div>
+							{message.images && message.images.length > 0 && (
+								<Thumbnails images={message.images} style={{ marginTop: "8px" }} />
+							)}
 						</>
 					)
 				case "text":
