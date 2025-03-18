@@ -2,4 +2,4 @@
 "claude-dev": patch
 ---
 
-Add Korean language
+Upgrade MCP SDK
