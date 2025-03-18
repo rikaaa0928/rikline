@@ -2,4 +2,4 @@
 "claude-dev": patch
 ---
 
-Upgrade MCP SDK
+SuccessButton to Tailwind
