@@ -31,8 +31,8 @@ import { arePathsEqual } from "../../utils/path"
 import { secondsToMs } from "../../utils/time"
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
-global.EventSource = require("eventsource").EventSource
-
+import { EventSource } from "eventsource"
+global.EventSource = EventSource
 export type McpConnection = {
 	server: McpServer
 	client: Client
