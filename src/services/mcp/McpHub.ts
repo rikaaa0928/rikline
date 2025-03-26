@@ -30,14 +30,10 @@ import { fileExistsAtPath } from "../../utils/fs"
 import { arePathsEqual } from "../../utils/path"
 import { secondsToMs } from "../../utils/time"
 import { GlobalFileNames } from "../../global-constants"
-import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
-import { EventSource } from "eventsource"
-global.EventSource = EventSource
 export type McpConnection = {
 	server: McpServer
 	client: Client
-	transport: Transport
+	transport: StdioClientTransport
 }
 
 export type McpTransportType = "stdio" | "sse"
@@ -77,9 +73,8 @@ const SseConfigSchema = z.object({
 })
 
 const StdioConfigSchema = z.object({
-	command: z.string().optional(),
+	command: z.string(),
 	args: z.array(z.string()).optional(),
-	url: z.string().optional(),
 	env: z.record(z.string()).optional(),
 	autoApprove: AutoApproveSchema.optional(),
 	disabled: z.boolean().optional(),
@@ -190,7 +185,7 @@ export class McpHub {
 		}
 	}
 
-	private async connectToServer(name: string, config: StdioServerParameters | SSEServerParameters): Promise<void> {
+	private async connectToServer(name: string, config: StdioServerParameters): Promise<void> {
 		// Remove existing connection if it exists (should never happen, the connection should be deleted beforehand)
 		this.connections = this.connections.filter((conn) => conn.server.name !== name)
 
@@ -206,21 +201,16 @@ export class McpHub {
 				},
 			)
 
-			let transport: Transport
-			if ((config as SSEServerParameters).url) {
-				transport = new SSEClientTransport(new URL((config as SSEServerParameters).url))
-			} else {
-				transport = new StdioClientTransport({
-					command: (config as StdioServerParameters).command,
-					args: (config as StdioServerParameters).args,
-					env: {
-						...(config as StdioServerParameters).env,
-						...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-						// ...(process.env.NODE_PATH ? { NODE_PATH: process.env.NODE_PATH } : {}),
-					},
-					stderr: "pipe", // necessary for stderr to be available
-				})
-			}
+			const transport = new StdioClientTransport({
+				command: config.command,
+				args: config.args,
+				env: {
+					...config.env,
+					...(process.env.PATH ? { PATH: process.env.PATH } : {}),
+					// ...(process.env.NODE_PATH ? { NODE_PATH: process.env.NODE_PATH } : {}),
+				},
+				stderr: "pipe", // necessary for stderr to be available
+			})
 
 			transport.onerror = async (error) => {
 				console.error(`Transport error for "${name}":`, error)
@@ -274,25 +264,23 @@ export class McpHub {
 			// transport.stderr is only available after the process has been started. However we can't start it separately from the .connect() call because it also starts the transport. And we can't place this after the connect call since we need to capture the stderr stream before the connection is established, in order to capture errors during the connection process.
 			// As a workaround, we start the transport ourselves, and then monkey-patch the start method to no-op so that .connect() doesn't try to start it again.
 			await transport.start()
-			if (transport instanceof StdioClientTransport) {
-				const stderrStream = transport.stderr
-				if (stderrStream) {
-					stderrStream.on("data", async (data: Buffer) => {
-						const errorOutput = data.toString()
-						console.error(`Server "${name}" stderr:`, errorOutput)
-						const connection = this.connections.find((conn) => conn.server.name === name)
-						if (connection) {
-							// NOTE: we do not set server status to "disconnected" because stderr logs do not necessarily mean the server crashed or disconnected, it could just be informational. In fact when the server first starts up, it immediately logs "<name> server running on stdio" to stderr.
-							this.appendErrorMessage(connection, errorOutput)
-							// Only need to update webview right away if it's already disconnected
-							if (connection.server.status === "disconnected") {
-								await this.notifyWebviewOfServerChanges()
-							}
+			const stderrStream = transport.stderr
+			if (stderrStream) {
+				stderrStream.on("data", async (data: Buffer) => {
+					const errorOutput = data.toString()
+					console.error(`Server "${name}" stderr:`, errorOutput)
+					const connection = this.connections.find((conn) => conn.server.name === name)
+					if (connection) {
+						// NOTE: we do not set server status to "disconnected" because stderr logs do not necessarily mean the server crashed or disconnected, it could just be informational. In fact when the server first starts up, it immediately logs "<name> server running on stdio" to stderr.
+						this.appendErrorMessage(connection, errorOutput)
+						// Only need to update webview right away if it's already disconnected
+						if (connection.server.status === "disconnected") {
+							await this.notifyWebviewOfServerChanges()
 						}
-					})
-				} else {
-					console.error(`No stderr stream for ${name}`)
-				}
+					}
+				})
+			} else {
+				console.error(`No stderr stream for ${name}`)
 			}
 			transport.start = async () => {} // No-op now, .connect() won't fail
 
