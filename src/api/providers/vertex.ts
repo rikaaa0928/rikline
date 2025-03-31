@@ -5,6 +5,7 @@ import { ApiHandler } from "../"
 import { ApiHandlerOptions, ModelInfo, vertexDefaultModelId, VertexModelId, vertexModels } from "../../shared/api"
 import { ApiStream } from "../transform/stream"
 import { VertexAI } from "@google-cloud/vertexai"
+import process from "node:process" // 导入 process
 
 // https://docs.anthropic.com/en/api/claude-on-vertex-ai
 export class VertexHandler implements ApiHandler {
@@ -14,14 +15,24 @@ export class VertexHandler implements ApiHandler {
 
 	constructor(options: ApiHandlerOptions) {
 		this.options = options
+
+		// 如果提供了凭证路径，则设置环境变量
+		// 注意：这应该在客户端初始化之前完成
+		if (options.vertexCredentialsPath) {
+			process.env.GOOGLE_APPLICATION_CREDENTIALS = options.vertexCredentialsPath
+		}
+
 		this.clientAnthropic = new AnthropicVertex({
 			projectId: this.options.vertexProjectId,
 			// https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude#regions
 			region: this.options.vertexRegion,
+			baseURL: options.vertexBaseUrl,
 		})
 		this.clientVertex = new VertexAI({
 			project: this.options.vertexProjectId,
 			location: this.options.vertexRegion,
+			// 如果提供了 baseUrl，则将其用作 apiEndpoint
+			apiEndpoint: this.options.vertexBaseUrl,
 		})
 	}
 

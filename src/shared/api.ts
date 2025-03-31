@@ -45,6 +45,8 @@ export interface ApiHandlerOptions {
 	awsBedrockEndpoint?: string
 	vertexProjectId?: string
 	vertexRegion?: string
+	vertexBaseUrl?: string // 添加 Vertex Base URL
+	vertexCredentialsPath?: string // 添加 Vertex 凭证路径
 	openAiBaseUrl?: string
 	openAiApiKey?: string
 	openAiModelId?: string

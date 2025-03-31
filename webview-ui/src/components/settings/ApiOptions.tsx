@@ -719,6 +719,21 @@ const ApiOptions = ({ showModelOptions, apiErrorMessage, modelIdErrorMessage, is
 							{"2) install the Google Cloud CLI › configure Application Default Credentials."}
 						</VSCodeLink>
 					</p>
+					<VSCodeTextField
+						value={apiConfiguration?.vertexBaseUrl || ""}
+						style={{ width: "100%", marginTop: "5px" }}
+						type="url"
+						onInput={handleInputChange("vertexBaseUrl")}
+						placeholder="Enter Base URL (optional)...">
+						<span style={{ fontWeight: 500 }}>Base URL (optional)</span>
+					</VSCodeTextField>
+					<VSCodeTextField
+						value={apiConfiguration?.vertexCredentialsPath || ""}
+						style={{ width: "100%", marginTop: "5px" }}
+						onInput={handleInputChange("vertexCredentialsPath")}
+						placeholder="Enter path to credentials file (optional)...">
+						<span style={{ fontWeight: 500 }}>Credentials Path (optional)</span>
+					</VSCodeTextField>
 				</div>
 			)}
 

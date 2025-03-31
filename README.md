@@ -7,6 +7,7 @@ English | <a href="https://github.com/cline/cline/blob/main/locales/es/README.md
 # Diff with Cline
 * gemini with base url setting
 * openrouter with base url setting
+* google vertex with base url and GOOGLE_APPLICATION_CREDENTIALS setting
 * support for images returns in mcp tools
 
 # Cline

@@ -78,6 +78,8 @@ type GlobalStateKey =
 	| "awsUseProfile"
 	| "vertexProjectId"
 	| "vertexRegion"
+	| "vertexBaseUrl"
+	| "vertexCredentialsPath"
 	| "lastShownAnnouncementId"
 	| "customInstructions"
 	| "taskHistory"
@@ -1146,6 +1148,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 			awsUseProfile,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiApiKey,
 			openAiModelId,
@@ -1198,6 +1202,8 @@ export class ClineProvider implements vscode.WebviewViewProvider {
 		await this.updateGlobalState("awsUseProfile", awsUseProfile)
 		await this.updateGlobalState("vertexProjectId", vertexProjectId)
 		await this.updateGlobalState("vertexRegion", vertexRegion)
+		await this.updateGlobalState("vertexBaseUrl", vertexBaseUrl)
+		await this.updateGlobalState("vertexCredentialsPath", vertexCredentialsPath)
 		await this.updateGlobalState("openAiBaseUrl", openAiBaseUrl)
 		await this.storeSecret("openAiApiKey", openAiApiKey)
 		await this.updateGlobalState("openAiModelId", openAiModelId)
@@ -2113,6 +2119,8 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			awsUseProfile,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiApiKey,
 			openAiModelId,
@@ -2179,6 +2187,8 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 			this.getGlobalState("awsUseProfile") as Promise<boolean | undefined>,
 			this.getGlobalState("vertexProjectId") as Promise<string | undefined>,
 			this.getGlobalState("vertexRegion") as Promise<string | undefined>,
+			this.getGlobalState("vertexBaseUrl") as Promise<string | undefined>,
+			this.getGlobalState("vertexCredentialsPath") as Promise<string | undefined>,
 			this.getGlobalState("openAiBaseUrl") as Promise<string | undefined>,
 			this.getSecret("openAiApiKey") as Promise<string | undefined>,
 			this.getGlobalState("openAiModelId") as Promise<string | undefined>,
@@ -2286,6 +2296,8 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 				awsUseProfile,
 				vertexProjectId,
 				vertexRegion,
+				vertexBaseUrl,
+				vertexCredentialsPath,
 				openAiBaseUrl,
 				openAiApiKey,
 				openAiModelId,
