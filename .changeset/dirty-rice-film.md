@@ -1,5 +1,5 @@
 ---
-"claude-dev": minor
+"rikline": minor
 ---
 
 added telemetry to track replace_in_file tool failures

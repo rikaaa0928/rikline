@@ -1,5 +1,5 @@
 ---
-"claude-dev": minor
+"rikline": minor
 ---
 
 Add toggle disabled for remote servers

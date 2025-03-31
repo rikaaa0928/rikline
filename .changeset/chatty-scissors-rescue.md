@@ -1,5 +1,5 @@
 ---
-"claude-dev": patch
+"rikline": patch
 ---
 
 Update Google Gemini API key link

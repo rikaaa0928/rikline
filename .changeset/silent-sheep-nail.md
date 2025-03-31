@@ -1,5 +1,5 @@
 ---
-"claude-dev": minor
+"rikline": minor
 ---
 
 adding task id to request headers

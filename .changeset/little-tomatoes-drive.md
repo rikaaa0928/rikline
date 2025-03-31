@@ -1,5 +1,5 @@
 ---
-"claude-dev": minor
+"rikline": minor
 ---
 
 Support connecting to SSE servers
