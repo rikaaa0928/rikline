@@ -64,7 +64,6 @@ import { ClineHandler } from "../api/providers/cline"
 import { ClineProvider } from "./webview/ClineProvider"
 import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay, LanguageKey } from "../shared/Languages"
 import { telemetryService } from "../services/telemetry/TelemetryService"
-import { ConversationTelemetryService, TelemetryChatMessage } from "../services/telemetry/ConversationTelemetryService"
 import pTimeout from "p-timeout"
 import { GlobalFileNames } from "../global-constants"
 import {
@@ -143,7 +142,6 @@ export class Cline {
 		})
 		this.providerRef = new WeakRef(provider)
 		this.apiProvider = apiConfiguration.apiProvider
-		this.api = buildApiHandler(apiConfiguration)
 		this.terminalManager = new TerminalManager()
 		this.urlContentFetcher = new UrlContentFetcher(provider.context)
 		this.browserSession = new BrowserSession(provider.context, browserSettings)
@@ -153,15 +151,28 @@ export class Cline {
 		this.autoApprovalSettings = autoApprovalSettings
 		this.browserSettings = browserSettings
 		this.chatSettings = chatSettings
+
+		// Initialize taskId first
 		if (historyItem) {
 			this.taskId = historyItem.id
 			this.conversationHistoryDeletedRange = historyItem.conversationHistoryDeletedRange
-			this.resumeTaskFromHistory()
 		} else if (task || images) {
 			this.taskId = Date.now().toString()
-			this.startTask(task, images)
 		} else {
 			throw new Error("Either historyItem or task/images must be provided")
+		}
+
+		// Now that taskId is initialized, we can build the API handler
+		this.api = buildApiHandler({
+			...apiConfiguration,
+			taskId: this.taskId,
+		})
+
+		// Continue with task initialization
+		if (historyItem) {
+			this.resumeTaskFromHistory()
+		} else if (task || images) {
+			this.startTask(task, images)
 		}
 
 		if (historyItem) {
@@ -1038,7 +1049,7 @@ export class Cline {
 						: ""
 				}` +
 				(responseText
-					? `\n\n${this.chatSettings?.mode === "plan" ? "New message to respond to with plan_mode_response tool (be sure to provide your response in the <response> parameter)" : "New instructions for task continuation"}:\n<user_message>\n${responseText}\n</user_message>`
+					? `\n\n${this.chatSettings?.mode === "plan" ? "New message to respond to with plan_mode_respond tool (be sure to provide your response in the <response> parameter)" : "New instructions for task continuation"}:\n<user_message>\n${responseText}\n</user_message>`
 					: this.chatSettings.mode === "plan"
 						? "(The user did not provide a new message. Consider asking them how they'd like you to proceed, or to switch to Act mode to continue with the task.)"
 						: ""),
@@ -1354,25 +1365,6 @@ export class Cline {
 				preferredLanguageInstructions,
 			)
 		}
-
-		// Capture system prompt for telemetry,
-		// ONLY if user is opted in, in advanced settings
-		if (this.providerRef.deref()?.conversationTelemetryService.isOptedInToConversationTelemetry()) {
-			const systemMessage: TelemetryChatMessage = {
-				role: "system",
-				content: systemPrompt,
-				ts: Date.now(), // we dont uniquely identify system messages, so we use the timestamp as the id
-			}
-
-			// no need for timeout here, as there's no timestamp to compare to
-			this.providerRef.deref()?.conversationTelemetryService.captureMessage(this.taskId, systemMessage, {
-				apiProvider: this.apiProvider,
-				model: this.api.getModel().id,
-				tokensIn: 0,
-				tokensOut: 0,
-			})
-		}
-
 		const contextManagementMetadata = this.contextManager.getNewContextMessagesAndMetadata(
 			this.apiConversationHistory,
 			this.clineMessages,
@@ -1572,7 +1564,7 @@ export class Cline {
 							return `[${block.name} for '${block.params.server_name}']`
 						case "ask_followup_question":
 							return `[${block.name} for '${block.params.question}']`
-						case "plan_mode_response":
+						case "plan_mode_respond":
 							return `[${block.name}]`
 						case "attempt_completion":
 							return `[${block.name}]`
@@ -1768,13 +1760,25 @@ export class Cline {
 									)
 								} catch (error) {
 									await this.say("diff_error", relPath)
+
+									// Extract error type from error message if possible, or use a generic type
+									const errorType =
+										error instanceof Error && error.message.includes("does not match anything")
+											? "search_not_found"
+											: "other_diff_error"
+
+									// Add telemetry for diff edit failure
+									telemetryService.captureDiffEditFailure(this.taskId, errorType)
+
 									pushToolResult(
 										formatResponse.toolError(
 											`${(error as Error)?.message}\n\n` +
 												`This is likely because the SEARCH block content doesn't match exactly with what's in the file, or if you used multiple SEARCH/REPLACE blocks they may not have been in the order they appear in the file.\n\n` +
 												`The file was reverted to its original state:\n\n` +
 												`<file_content path="${relPath.toPosix()}">\n${this.diffViewProvider.originalContent}\n</file_content>\n\n` +
-												`Try again with fewer/more precise SEARCH blocks.\n(If you run into this error two times in a row, you may use the write_to_file tool as a fallback.)`,
+												`First, make sure you call the read_file tool and re-read the file again in case any changes were made, to get its latest state. Then, make a proper, TARGETED search and replace edit using the write_to_file tool.` +
+												`You may want to try fewer/more precise SEARCH blocks.\n(If you run into this error three times in a row, you may use the write_to_file tool as a fallback. ` +
+												`Keep in mind, the write_to_file fallback is far from ideal, as this means you'll be re-writing the entire contents of the file just to make a few edits, which takes time and money. So let's bias towards using replace_in_file as effectively as possible)`,
 										),
 									)
 									await this.diffViewProvider.revertChanges()
@@ -2817,7 +2821,7 @@ export class Cline {
 							break
 						}
 					}
-					case "plan_mode_response": {
+					case "plan_mode_respond": {
 						const response: string | undefined = block.params.response
 						const optionsRaw: string | undefined = block.params.options
 						const sharedMessage = {
@@ -2826,12 +2830,12 @@ export class Cline {
 						} satisfies ClinePlanModeResponse
 						try {
 							if (block.partial) {
-								await this.ask("plan_mode_response", JSON.stringify(sharedMessage), block.partial).catch(() => {})
+								await this.ask("plan_mode_respond", JSON.stringify(sharedMessage), block.partial).catch(() => {})
 								break
 							} else {
 								if (!response) {
 									this.consecutiveMistakeCount++
-									pushToolResult(await this.sayAndCreateMissingParamError("plan_mode_response", "response"))
+									pushToolResult(await this.sayAndCreateMissingParamError("plan_mode_respond", "response"))
 									//
 									break
 								}
@@ -2845,7 +2849,7 @@ export class Cline {
 								// }
 
 								this.isAwaitingPlanResponse = true
-								let { text, images } = await this.ask("plan_mode_response", JSON.stringify(sharedMessage), false)
+								let { text, images } = await this.ask("plan_mode_respond", JSON.stringify(sharedMessage), false)
 								this.isAwaitingPlanResponse = false
 
 								// webview invoke sendMessage will send this marker in order to put webview into the proper state (responding to an ask) and as a flag to extension that the user switched to ACT mode.
@@ -2857,7 +2861,7 @@ export class Cline {
 								if (optionsRaw && text && parsePartialArrayString(optionsRaw).includes(text)) {
 									// Valid option selected, don't show user message in UI
 									// Update last followup message with selected option
-									const lastPlanMessage = findLast(this.clineMessages, (m) => m.ask === "plan_mode_response")
+									const lastPlanMessage = findLast(this.clineMessages, (m) => m.ask === "plan_mode_respond")
 									if (lastPlanMessage) {
 										lastPlanMessage.text = JSON.stringify({
 											...sharedMessage,
@@ -3205,39 +3209,6 @@ export class Cline {
 
 		telemetryService.captureConversationTurnEvent(this.taskId, this.apiProvider, this.api.getModel().id, "user")
 
-		// Capture message data for telemetry,
-		// ONLY if user is opted in, in advanced settings
-		if (this.providerRef.deref()?.conversationTelemetryService.isOptedInToConversationTelemetry()) {
-			// Get the last message from apiConversationHistory
-			const lastMessage = this.apiConversationHistory[this.apiConversationHistory.length - 1]
-
-			// Get the corresponding timestamp from clineMessages
-			// The last message in clineMessages should be the one we just added
-
-			const lastClineMessage = this.clineMessages[this.clineMessages.length - 1]
-			const ts = lastClineMessage.ts
-
-			// Send individual message to telemetry
-			this.providerRef.deref()?.conversationTelemetryService.captureMessage(
-				this.taskId,
-				// Add the timestamp to the message object for telemetry
-				{
-					...lastMessage,
-					ts,
-				},
-				{
-					apiProvider: this.apiProvider,
-					model: this.api.getModel().id,
-					tokensIn: 0,
-					tokensOut: 0,
-				},
-			)
-
-			// Send entire conversation history to cleanup endpoint
-			// This ensures deleted messages are properly handled in telemetry
-			this.providerRef.deref()?.conversationTelemetryService.cleanupTask(this.taskId, this.clineMessages)
-		}
-
 		// since we sent off a placeholder api_req_started message to update the webview while waiting to actually start the API request (to load potential details for example), we need to update the text of that message
 		const lastApiReqIndex = findLastIndex(this.clineMessages, (m) => m.say === "api_req_started")
 		this.clineMessages[lastApiReqIndex].text = JSON.stringify({
@@ -3314,36 +3285,6 @@ export class Cline {
 				await this.saveClineMessages()
 
 				telemetryService.captureConversationTurnEvent(this.taskId, this.apiProvider, this.api.getModel().id, "assistant")
-
-				// Capture message data for telemetry after assistant response
-				// ONLY if user is opted in, in advanced settings
-				if (this.providerRef.deref()?.conversationTelemetryService.isOptedInToConversationTelemetry()) {
-					// Get the last message from apiConversationHistory
-					const lastMessage = this.apiConversationHistory[this.apiConversationHistory.length - 1]
-
-					// Find the corresponding timestamp from clineMessages
-					// For assistant messages, we need to find the most recent "text" message
-					const lastTextMessage = findLast(this.clineMessages, (m) => m.say === "text")
-
-					// Add the timestamp to the message object for telemetry
-					if (!lastTextMessage) {
-						console.error("No text message found in clineMessages")
-					} else {
-						this.providerRef.deref()?.conversationTelemetryService.captureMessage(
-							this.taskId,
-							{
-								...lastMessage,
-								ts: lastTextMessage.ts,
-							},
-							{
-								apiProvider: this.apiProvider,
-								model: this.api.getModel().id,
-								tokensIn: inputTokens,
-								tokensOut: outputTokens,
-							},
-						)
-					}
-				}
 
 				// signals to provider that it can retrieve the saved messages from disk, as abortTask can not be awaited on in nature
 				this.didFinishAbortingStream = true
@@ -3493,32 +3434,6 @@ export class Cline {
 					role: "assistant",
 					content: [{ type: "text", text: assistantMessage }],
 				})
-
-				// Capture message data for telemetry after assistant response,
-				// ONLY if user is opted in, in advanced settings
-				if (this.providerRef.deref()?.conversationTelemetryService.isOptedInToConversationTelemetry()) {
-					// Get the last message from apiConversationHistory
-					const lastMessage = this.apiConversationHistory[this.apiConversationHistory.length - 1]
-
-					// Find the corresponding timestamp from clineMessages
-					const lastClineMessage = this.clineMessages[this.clineMessages.length - 1]
-
-					if (lastClineMessage) {
-						this.providerRef.deref()?.conversationTelemetryService.captureMessage(
-							this.taskId,
-							{
-								...lastMessage,
-								ts: lastClineMessage.ts,
-							},
-							{
-								apiProvider: this.apiProvider,
-								model: this.api.getModel().id,
-								tokensIn: inputTokens,
-								tokensOut: outputTokens,
-							},
-						)
-					}
-				}
 
 				// NOTE: this comment is here for future reference - this was a workaround for userMessageContent not getting set to true. It was due to it not recursively calling for partial blocks when didRejectTool, so it would get stuck waiting for a partial block to complete before it could continue.
 				// in case the content blocks finished
@@ -3755,7 +3670,7 @@ export class Cline {
 		if (this.chatSettings.mode === "plan") {
 			details += "\nPLAN MODE"
 			details +=
-				"\nIn this mode you should focus on information gathering, asking questions, and architecting a solution. Once you have a plan, use the plan_mode_response tool to engage in a conversational back and forth with the user. Do not use the plan_mode_response tool until you've gathered all the information you need e.g. with read_file or ask_followup_question."
+				"\nIn this mode you should focus on information gathering, asking questions, and architecting a solution. Once you have a plan, use the plan_mode_respond tool to engage in a conversational back and forth with the user. Do not use the plan_mode_respond tool until you've gathered all the information you need e.g. with read_file or ask_followup_question."
 			details +=
 				'\n(Remember: If it seems the user wants you to use tools only available in Act Mode, you should ask the user to "toggle to Act mode" (use those words) - they will have to manually do this themselves with the Plan/Act toggle button below. You do not have the ability to switch to Act Mode yourself, and must wait for the user to do it themselves once they are satisfied with the plan. You also cannot present an option to toggle to Act mode, as this will be something you need to direct the user to do manually themselves.)'
 		} else {
