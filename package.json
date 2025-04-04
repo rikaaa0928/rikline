@@ -2,7 +2,7 @@
 	"name": "rikline",
 	"displayName": "rikline",
 	"description": "Autonomous coding agent right in your IDE, capable of creating/editing files, running commands, using the browser, and more with your permission every step of the way.",
-	"version": "3.8.4",
+	"version": "3.9.0",
 	"icon": "assets/icons/icon.png",
 	"engines": {
 		"vscode": "^1.84.0"
@@ -303,6 +303,7 @@
 		"format:fix": "prettier . --write",
 		"test": "vscode-test",
 		"test:ci": "node scripts/test-ci.js",
+		"test:unit": "TS_NODE_PROJECT='./tsconfig.unit-test.json' mocha",
 		"test:coverage": "vscode-test --coverage",
 		"install:all": "npm install && cd webview-ui && npm install",
 		"dev:webview": "cd webview-ui && npm run dev",
@@ -317,11 +318,15 @@
 	"devDependencies": {
 		"@changesets/cli": "^2.27.12",
 		"@types/chai": "^5.0.1",
+		"@types/clone-deep": "^4.0.4",
 		"@types/diff": "^5.2.1",
+		"@types/get-folder-size": "^3.0.4",
 		"@types/mocha": "^10.0.7",
 		"@types/node": "20.x",
+		"@types/pdf-parse": "^1.1.4",
 		"@types/should": "^11.2.0",
 		"@types/sinon": "^17.0.4",
+		"@types/turndown": "^5.0.5",
 		"@types/vscode": "^1.84.0",
 		"@typescript-eslint/eslint-plugin": "^7.14.1",
 		"@typescript-eslint/parser": "^7.11.0",
@@ -335,6 +340,7 @@
 		"prettier": "^3.3.3",
 		"should": "^13.2.3",
 		"sinon": "^19.0.2",
+		"ts-node": "^10.9.2",
 		"typescript": "^5.4.5"
 	},
 	"dependencies": {
@@ -352,10 +358,6 @@
 		"@opentelemetry/sdk-node": "^0.39.1",
 		"@opentelemetry/sdk-trace-node": "^1.30.1",
 		"@opentelemetry/semantic-conventions": "^1.30.0",
-		"@types/clone-deep": "^4.0.4",
-		"@types/get-folder-size": "^3.0.4",
-		"@types/pdf-parse": "^1.1.4",
-		"@types/turndown": "^5.0.5",
 		"@vscode/codicons": "^0.0.36",
 		"axios": "^1.8.2",
 		"cheerio": "^1.0.0",
