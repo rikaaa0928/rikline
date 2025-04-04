@@ -68,6 +68,8 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		awsUseProfile,
 		vertexProjectId,
 		vertexRegion,
+		vertexBaseUrl,
+		vertexCredentialsPath,
 		openAiBaseUrl,
 		openAiApiKey,
 		openAiModelId,
@@ -79,6 +81,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		lmStudioBaseUrl,
 		anthropicBaseUrl,
 		geminiApiKey,
+		geminiBaseUrl,
 		openAiNativeApiKey,
 		deepSeekApiKey,
 		requestyApiKey,
@@ -91,6 +94,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		openRouterModelId,
 		openRouterModelInfo,
 		openRouterProviderSorting,
+		openRouterBaseUrl,
 		lastShownAnnouncementId,
 		customInstructions,
 		taskHistory,
@@ -132,6 +136,8 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getGlobalState(context, "awsUseProfile") as Promise<boolean | undefined>,
 		getGlobalState(context, "vertexProjectId") as Promise<string | undefined>,
 		getGlobalState(context, "vertexRegion") as Promise<string | undefined>,
+		getGlobalState(context, "vertexBaseUrl") as Promise<string | undefined>,
+		getGlobalState(context, "vertexCredentialsPath") as Promise<string | undefined>,
 		getGlobalState(context, "openAiBaseUrl") as Promise<string | undefined>,
 		getSecret(context, "openAiApiKey") as Promise<string | undefined>,
 		getGlobalState(context, "openAiModelId") as Promise<string | undefined>,
@@ -143,6 +149,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getGlobalState(context, "lmStudioBaseUrl") as Promise<string | undefined>,
 		getGlobalState(context, "anthropicBaseUrl") as Promise<string | undefined>,
 		getSecret(context, "geminiApiKey") as Promise<string | undefined>,
+		getGlobalState(context, "geminiBaseUrl") as Promise<string | undefined>,
 		getSecret(context, "openAiNativeApiKey") as Promise<string | undefined>,
 		getSecret(context, "deepSeekApiKey") as Promise<string | undefined>,
 		getSecret(context, "requestyApiKey") as Promise<string | undefined>,
@@ -155,6 +162,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getGlobalState(context, "openRouterModelId") as Promise<string | undefined>,
 		getGlobalState(context, "openRouterModelInfo") as Promise<ModelInfo | undefined>,
 		getGlobalState(context, "openRouterProviderSorting") as Promise<string | undefined>,
+		getGlobalState(context, "openRouterBaseUrl") as Promise<string | undefined>,
 		getGlobalState(context, "lastShownAnnouncementId") as Promise<string | undefined>,
 		getGlobalState(context, "customInstructions") as Promise<string | undefined>,
 		getGlobalState(context, "taskHistory") as Promise<HistoryItem[] | undefined>,
@@ -235,6 +243,8 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 			awsUseProfile,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiApiKey,
 			openAiModelId,
@@ -246,6 +256,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 			lmStudioBaseUrl,
 			anthropicBaseUrl,
 			geminiApiKey,
+			geminiBaseUrl,
 			openAiNativeApiKey,
 			deepSeekApiKey,
 			requestyApiKey,
@@ -259,6 +270,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 			openRouterModelId,
 			openRouterModelInfo,
 			openRouterProviderSorting,
+			openRouterBaseUrl,
 			vsCodeLmModelSelector,
 			o3MiniReasoningEffort,
 			thinkingBudgetTokens,
@@ -305,6 +317,8 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 		awsUseProfile,
 		vertexProjectId,
 		vertexRegion,
+		vertexBaseUrl,
+		vertexCredentialsPath,
 		openAiBaseUrl,
 		openAiApiKey,
 		openAiModelId,
@@ -316,6 +330,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 		lmStudioBaseUrl,
 		anthropicBaseUrl,
 		geminiApiKey,
+		geminiBaseUrl,
 		openAiNativeApiKey,
 		deepSeekApiKey,
 		requestyApiKey,
@@ -328,6 +343,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 		openRouterModelId,
 		openRouterModelInfo,
 		openRouterProviderSorting,
+		openRouterBaseUrl,
 		vsCodeLmModelSelector,
 		liteLlmBaseUrl,
 		liteLlmModelId,
@@ -355,6 +371,8 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await updateGlobalState(context, "awsUseProfile", awsUseProfile)
 	await updateGlobalState(context, "vertexProjectId", vertexProjectId)
 	await updateGlobalState(context, "vertexRegion", vertexRegion)
+	await updateGlobalState(context, "vertexBaseUrl", vertexBaseUrl)
+	await updateGlobalState(context, "vertexCredentialsPath", vertexCredentialsPath)
 	await updateGlobalState(context, "openAiBaseUrl", openAiBaseUrl)
 	await storeSecret(context, "openAiApiKey", openAiApiKey)
 	await updateGlobalState(context, "openAiModelId", openAiModelId)
@@ -366,6 +384,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await updateGlobalState(context, "lmStudioBaseUrl", lmStudioBaseUrl)
 	await updateGlobalState(context, "anthropicBaseUrl", anthropicBaseUrl)
 	await storeSecret(context, "geminiApiKey", geminiApiKey)
+	await updateGlobalState(context, "geminiBaseUrl", geminiBaseUrl)
 	await storeSecret(context, "openAiNativeApiKey", openAiNativeApiKey)
 	await storeSecret(context, "deepSeekApiKey", deepSeekApiKey)
 	await storeSecret(context, "requestyApiKey", requestyApiKey)
@@ -378,6 +397,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await updateGlobalState(context, "openRouterModelId", openRouterModelId)
 	await updateGlobalState(context, "openRouterModelInfo", openRouterModelInfo)
 	await updateGlobalState(context, "openRouterProviderSorting", openRouterProviderSorting)
+	await updateGlobalState(context, "openRouterBaseUrl", openRouterBaseUrl)
 	await updateGlobalState(context, "vsCodeLmModelSelector", vsCodeLmModelSelector)
 	await updateGlobalState(context, "liteLlmBaseUrl", liteLlmBaseUrl)
 	await updateGlobalState(context, "liteLlmModelId", liteLlmModelId)

@@ -75,7 +75,6 @@ export const ExtensionStateContextProvider: React.FC<{
 							config.lmStudioModelId,
 							config.liteLlmApiKey,
 							config.geminiApiKey,
-							config.geminiBaseUrl,
 							config.openAiNativeApiKey,
 							config.deepSeekApiKey,
 							config.requestyApiKey,
