@@ -12,7 +12,7 @@ export class XAIHandler implements ApiHandler {
 	constructor(options: ApiHandlerOptions) {
 		this.options = options
 		this.client = new OpenAI({
-			baseURL: "https://api.x.ai/v1",
+			baseURL: this.options.xaiBaseUrl || "https://api.x.ai/v1",
 			apiKey: this.options.xaiApiKey,
 		})
 	}

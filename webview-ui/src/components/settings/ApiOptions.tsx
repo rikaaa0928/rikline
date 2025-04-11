@@ -1432,6 +1432,14 @@ const ApiOptions = ({ showModelOptions, apiErrorMessage, modelIdErrorMessage, is
 							</VSCodeLink>
 						)}
 					</p>
+					<VSCodeTextField
+						value={apiConfiguration?.xaiBaseUrl || ""}
+						style={{ width: "100%" }}
+						type="url"
+						onInput={handleInputChange("xaiBaseUrl")}
+						placeholder="Enter X AI Base URL...">
+						<span style={{ fontWeight: 500 }}>X AI Base URL</span>
+					</VSCodeTextField>
 					{/* Note: To fully implement this, you would need to add a handler in ClineProvider.ts */}
 					{/* {apiConfiguration?.xaiApiKey && (
 						<button

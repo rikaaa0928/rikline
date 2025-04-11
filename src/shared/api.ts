@@ -76,6 +76,7 @@ export interface ApiHandlerOptions {
 	asksageApiUrl?: string
 	asksageApiKey?: string
 	xaiApiKey?: string
+	xaiBaseUrl?: string
 	thinkingBudgetTokens?: number
 	sambanovaApiKey?: string
 }

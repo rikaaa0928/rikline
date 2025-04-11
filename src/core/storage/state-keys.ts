@@ -68,6 +68,7 @@ export type GlobalStateKey =
 	| "mcpMarketplaceCatalog"
 	| "telemetrySetting"
 	| "asksageApiUrl"
+	| "xaiBaseUrl"
 	| "thinkingBudgetTokens"
 	| "planActSeparateModelsSetting"
 	| "favoritedModelIds"

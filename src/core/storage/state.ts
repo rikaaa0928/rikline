@@ -118,6 +118,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		asksageApiKey,
 		asksageApiUrl,
 		xaiApiKey,
+		xaiBaseUrl,
 		thinkingBudgetTokens,
 		sambanovaApiKey,
 		planActSeparateModelsSettingRaw,
@@ -189,6 +190,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getSecret(context, "asksageApiKey") as Promise<string | undefined>,
 		getGlobalState(context, "asksageApiUrl") as Promise<string | undefined>,
 		getSecret(context, "xaiApiKey") as Promise<string | undefined>,
+		getGlobalState(context, "xaiBaseUrl") as Promise<string | undefined>,
 		getGlobalState(context, "thinkingBudgetTokens") as Promise<number | undefined>,
 		getSecret(context, "sambanovaApiKey") as Promise<string | undefined>,
 		getGlobalState(context, "planActSeparateModelsSetting") as Promise<boolean | undefined>,
@@ -288,6 +290,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 			asksageApiKey,
 			asksageApiUrl,
 			xaiApiKey,
+			xaiBaseUrl,
 			sambanovaApiKey,
 			favoritedModelIds,
 		},
@@ -363,6 +366,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 		asksageApiKey,
 		asksageApiUrl,
 		xaiApiKey,
+		xaiBaseUrl,
 		thinkingBudgetTokens,
 		clineApiKey,
 		sambanovaApiKey,
@@ -406,6 +410,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await storeSecret(context, "mistralApiKey", mistralApiKey)
 	await storeSecret(context, "liteLlmApiKey", liteLlmApiKey)
 	await storeSecret(context, "xaiApiKey", xaiApiKey)
+	await updateGlobalState(context, "xaiBaseUrl", xaiBaseUrl)
 	await updateGlobalState(context, "azureApiVersion", azureApiVersion)
 	await updateGlobalState(context, "openRouterModelId", openRouterModelId)
 	await updateGlobalState(context, "openRouterModelInfo", openRouterModelInfo)
