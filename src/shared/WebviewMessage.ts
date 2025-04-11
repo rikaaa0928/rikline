@@ -5,6 +5,7 @@ import { ChatSettings } from "./ChatSettings"
 import { UserInfo } from "./UserInfo"
 import { ChatContent } from "./ChatContent"
 import { TelemetrySetting } from "./TelemetrySetting"
+import { McpViewTab } from "./mcp"
 
 export interface WebviewMessage {
 	type:
@@ -35,6 +36,10 @@ export interface WebviewMessage {
 		| "deleteMcpServer"
 		| "autoApprovalSettings"
 		| "browserSettings"
+		| "discoverBrowser"
+		| "testBrowserConnection"
+		| "browserConnectionResult"
+		| "browserRelaunchResult"
 		| "togglePlanActMode"
 		| "checkpointDiff"
 		| "checkpointRestore"
@@ -66,9 +71,18 @@ export interface WebviewMessage {
 		| "fetchUserCreditsData"
 		| "optionsResponse"
 		| "requestTotalTasksSize"
+		| "relaunchChromeDebugMode"
 		| "taskFeedback"
+		| "getBrowserConnectionInfo"
+		| "getDetectedChromePath"
+		| "detectedChromePath"
+		| "scrollToSettings"
+		| "getRelativePaths" // Handles single and multiple URI resolution
+		| "searchFiles"
+		| "toggleFavoriteModel"
 	// | "relaunchChromeDebugMode"
 	text?: string
+	uris?: string[] // Used for getRelativePaths
 	disabled?: boolean
 	askResponse?: ClineAskResponse
 	apiConfiguration?: ApiConfiguration
@@ -81,6 +95,7 @@ export interface WebviewMessage {
 	chatContent?: ChatContent
 	mcpId?: string
 	timeout?: number
+	tab?: McpViewTab
 	// For toggleToolAutoApprove
 	serverName?: string
 	serverUrl?: string
@@ -97,6 +112,10 @@ export interface WebviewMessage {
 	customInstructionsSetting?: string
 	// For task feedback
 	feedbackType?: TaskFeedbackType
+	mentionsRequestId?: string
+	query?: string
+	// For toggleFavoriteModel
+	modelId?: string
 }
 
 export type ClineAskResponse = "yesButtonClicked" | "noButtonClicked" | "messageResponse"

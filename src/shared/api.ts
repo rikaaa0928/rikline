@@ -12,6 +12,7 @@ export type ApiProvider =
 	| "together"
 	| "deepseek"
 	| "qwen"
+	| "doubao"
 	| "mistral"
 	| "vscode-lm"
 	| "cline"
@@ -28,6 +29,7 @@ export interface ApiHandlerOptions {
 	liteLlmBaseUrl?: string
 	liteLlmModelId?: string
 	liteLlmApiKey?: string
+	liteLlmUsePromptCache?: boolean
 	anthropicBaseUrl?: string
 	openRouterApiKey?: string
 	openRouterModelId?: string
@@ -65,6 +67,7 @@ export interface ApiHandlerOptions {
 	togetherApiKey?: string
 	togetherModelId?: string
 	qwenApiKey?: string
+	doubaoApiKey?: string
 	mistralApiKey?: string
 	azureApiVersion?: string
 	vsCodeLmModelSelector?: any
@@ -79,9 +82,15 @@ export interface ApiHandlerOptions {
 
 export type ApiConfiguration = ApiHandlerOptions & {
 	apiProvider?: ApiProvider
+	favoritedModelIds?: string[]
 }
 
 // Models
+
+interface PriceTier {
+	tokenLimit: number // Upper limit (inclusive) of *input* tokens for this price. Use Infinity for the highest tier.
+	price: number // Price per million tokens for this tier.
+}
 
 export interface ModelInfo {
 	maxTokens?: number
@@ -89,8 +98,10 @@ export interface ModelInfo {
 	supportsImages?: boolean
 	supportsComputerUse?: boolean
 	supportsPromptCache: boolean // this value is hardcoded for now
-	inputPrice?: number
-	outputPrice?: number
+	inputPrice?: number // Keep for non-tiered input models
+	inputPriceTiers?: PriceTier[] // Add for tiered input pricing
+	outputPrice?: number // Keep for non-tiered output models
+	outputPriceTiers?: PriceTier[] // Add for tiered output pricing
 	cacheWritesPrice?: number
 	cacheReadsPrice?: number
 	description?: string
@@ -380,6 +391,22 @@ export const vertexModels = {
 		inputPrice: 0,
 		outputPrice: 0,
 	},
+	"gemini-2.5-pro-preview-03-25": {
+		maxTokens: 65536,
+		contextWindow: 1_048_576,
+		supportsImages: true,
+		supportsPromptCache: false,
+		// inputPrice: 1.25, // Removed
+		// outputPrice: 10, // Removed
+		inputPriceTiers: [
+			{ tokenLimit: 200000, price: 1.25 }, // Input price for <= 200k input tokens
+			{ tokenLimit: Infinity, price: 2.5 }, // Input price for > 200k input tokens
+		],
+		outputPriceTiers: [
+			{ tokenLimit: 200000, price: 10.0 }, // Output price for <= 200k input tokens
+			{ tokenLimit: Infinity, price: 15.0 }, // Output price for > 200k input tokens
+		],
+	},
 	"gemini-2.0-flash-thinking-exp-01-21": {
 		maxTokens: 65_536,
 		contextWindow: 1_048_576,
@@ -461,6 +488,20 @@ export const geminiModels = {
 		supportsPromptCache: false,
 		inputPrice: 0,
 		outputPrice: 0,
+	},
+	"gemini-2.5-pro-preview-03-25": {
+		maxTokens: 65536,
+		contextWindow: 1_048_576,
+		supportsImages: true,
+		supportsPromptCache: false,
+		inputPriceTiers: [
+			{ tokenLimit: 200000, price: 1.25 }, // Input price for <= 200k input tokens
+			{ tokenLimit: Infinity, price: 2.5 }, // Input price for > 200k input tokens
+		],
+		outputPriceTiers: [
+			{ tokenLimit: 200000, price: 10.0 }, // Output price for <= 200k input tokens
+			{ tokenLimit: Infinity, price: 15.0 }, // Output price for > 200k input tokens
+		],
 	},
 	"gemini-2.0-flash-001": {
 		maxTokens: 8192,
@@ -1102,6 +1143,34 @@ export const mainlandQwenModels = {
 	},
 } as const satisfies Record<string, ModelInfo>
 
+// Doubao
+// https://www.volcengine.com/docs/82379/1298459
+// https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement
+export type DoubaoModelId = keyof typeof doubaoModels
+export const doubaoDefaultModelId: DoubaoModelId = "doubao-1-5-pro-256k-250115"
+export const doubaoModels = {
+	"doubao-1-5-pro-256k-250115": {
+		maxTokens: 12_288,
+		contextWindow: 256_000,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.7,
+		outputPrice: 1.3,
+		cacheWritesPrice: 0,
+		cacheReadsPrice: 0,
+	},
+	"doubao-1-5-pro-32k-250115": {
+		maxTokens: 12_288,
+		contextWindow: 32_000,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.11,
+		outputPrice: 0.3,
+		cacheWritesPrice: 0,
+		cacheReadsPrice: 0,
+	},
+} as const satisfies Record<string, ModelInfo>
+
 // Mistral
 // https://docs.mistral.ai/getting-started/models/models_overview/
 export type MistralModelId = keyof typeof mistralModels
@@ -1197,9 +1266,11 @@ export const liteLlmModelInfoSaneDefaults: ModelInfo = {
 	maxTokens: -1,
 	contextWindow: 128_000,
 	supportsImages: true,
-	supportsPromptCache: false,
+	supportsPromptCache: true,
 	inputPrice: 0,
 	outputPrice: 0,
+	cacheWritesPrice: 0,
+	cacheReadsPrice: 0,
 }
 
 // AskSage Models
@@ -1253,8 +1324,44 @@ export const askSageModels = {
 // X AI
 // https://docs.x.ai/docs/api-reference
 export type XAIModelId = keyof typeof xaiModels
-export const xaiDefaultModelId: XAIModelId = "grok-2-latest"
+export const xaiDefaultModelId: XAIModelId = "grok-3-beta"
 export const xaiModels = {
+	"grok-3-beta": {
+		maxTokens: 8192,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 3.0,
+		outputPrice: 15.0,
+		description: "X AI's Grok-3 beta model with 131K context window",
+	},
+	"grok-3-fast-beta": {
+		maxTokens: 8192,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 5.0,
+		outputPrice: 25.0,
+		description: "X AI's Grok-3 fast beta model with 131K context window",
+	},
+	"grok-3-mini-beta": {
+		maxTokens: 8192,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.3,
+		outputPrice: 0.5,
+		description: "X AI's Grok-3 mini beta model with 131K context window",
+	},
+	"grok-3-mini-fast-beta": {
+		maxTokens: 8192,
+		contextWindow: 131072,
+		supportsImages: false,
+		supportsPromptCache: false,
+		inputPrice: 0.6,
+		outputPrice: 4.0,
+		description: "X AI's Grok-3 mini fast beta model with 131K context window",
+	},
 	"grok-2-latest": {
 		maxTokens: 8192,
 		contextWindow: 131072,

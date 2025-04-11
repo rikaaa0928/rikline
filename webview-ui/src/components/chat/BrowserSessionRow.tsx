@@ -3,14 +3,14 @@ import deepEqual from "fast-deep-equal"
 import React, { CSSProperties, memo, useEffect, useMemo, useRef, useState } from "react"
 import { useSize } from "react-use"
 import styled from "styled-components"
-import { BROWSER_VIEWPORT_PRESETS } from "../../../../src/shared/BrowserSettings"
-import { BrowserAction, BrowserActionResult, ClineMessage, ClineSayBrowserAction } from "../../../../src/shared/ExtensionMessage"
-import { useExtensionState } from "../../context/ExtensionStateContext"
-import { vscode } from "../../utils/vscode"
-import { BrowserSettingsMenu } from "../browser/BrowserSettingsMenu"
-import { CheckpointControls } from "../common/CheckpointControls"
-import CodeBlock, { CODE_BLOCK_BG_COLOR } from "../common/CodeBlock"
-import { ChatRowContent, ProgressIndicator } from "./ChatRow"
+import { BROWSER_VIEWPORT_PRESETS } from "@shared/BrowserSettings"
+import { BrowserAction, BrowserActionResult, ClineMessage, ClineSayBrowserAction } from "@shared/ExtensionMessage"
+import { useExtensionState } from "@/context/ExtensionStateContext"
+import { vscode } from "@/utils/vscode"
+import { BrowserSettingsMenu } from "@/components/browser/BrowserSettingsMenu"
+import { CheckpointControls } from "@/components/common/CheckpointControls"
+import CodeBlock, { CODE_BLOCK_BG_COLOR } from "@/components/common/CodeBlock"
+import { ChatRowContent, ProgressIndicator } from "@/components/chat/ChatRow"
 
 interface BrowserSessionRowProps {
 	messages: ClineMessage[]
@@ -275,7 +275,6 @@ const BrowserSessionRow = memo((props: BrowserSessionRowProps) => {
 				consoleLogs: currentPage?.currentState.consoleLogs,
 				screenshot: currentPage?.currentState.screenshot,
 			}
-
 	const [actionContent, { height: actionHeight }] = useSize(
 		<div>
 			{currentPage?.nextAction?.messages.map((message) => (
@@ -365,7 +364,7 @@ const BrowserSessionRow = memo((props: BrowserSessionRowProps) => {
 						}}>
 						<div style={urlTextStyle}>{displayState.url || "http"}</div>
 					</div>
-					<BrowserSettingsMenu disabled={!shouldShowSettings} maxWidth={maxWidth} />
+					<BrowserSettingsMenu />
 				</div>
 
 				{/* Screenshot Area */}
