@@ -5,6 +5,7 @@ import { ApiHandler } from "../"
 import { ApiHandlerOptions, ModelInfo, vertexDefaultModelId, VertexModelId, vertexModels } from "../../shared/api"
 import { ApiStream } from "../transform/stream"
 import { VertexAI } from "@google-cloud/vertexai"
+import { calculateApiCostOpenAI } from "../../utils/cost"
 import process from "node:process" // 导入 process
 
 // https://docs.anthropic.com/en/api/claude-on-vertex-ai
@@ -275,6 +276,17 @@ export class VertexHandler implements ApiHandler {
 							}
 						}
 					}
+				}
+			}
+			// Handle token usage metadata
+			const { usageMetadata } = await streamingResult.response
+			if (usageMetadata) {
+				const { promptTokenCount = 0, candidatesTokenCount = 0 } = usageMetadata
+				yield {
+					type: "usage",
+					inputTokens: promptTokenCount,
+					outputTokens: candidatesTokenCount,
+					totalCost: calculateApiCostOpenAI(model.info, promptTokenCount, candidatesTokenCount, 0, 0),
 				}
 			}
 		}
