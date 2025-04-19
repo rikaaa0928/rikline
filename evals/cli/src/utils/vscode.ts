@@ -87,7 +87,7 @@ export async function spawnVSCode(workspacePath: string, vsixPath?: string): Pro
 		// Show the activity bar and sidebar
 		"workbench.activityBar.visible": true,
 		"workbench.sideBar.visible": true,
-		"workbench.view.extension.saoudrizwan.claude-dev-ActivityBar.visible": true,
+		"workbench.view.extension.rikaaa0928.rikline-ActivityBar.visible": true,
 		"workbench.view.alwaysShowHeaderActions": true,
 		"workbench.editor.openSideBySideDirection": "right",
 
@@ -111,13 +111,13 @@ export async function spawnVSCode(workspacePath: string, vsixPath?: string): Pro
 	const keybindings = [
 		{
 			key: "alt+c",
-			command: "workbench.view.extension.saoudrizwan.claude-dev-ActivityBar",
-			when: "viewContainer.workbench.view.extension.saoudrizwan.claude-dev-ActivityBar.enabled",
+			command: "workbench.view.extension.rikaaa0928.rikline-ActivityBar",
+			when: "viewContainer.workbench.view.extension.rikaaa0928.rikline-ActivityBar.enabled",
 		},
 		{
 			key: "alt+shift+c",
 			command: "cline.openInNewTab",
-			when: "viewContainer.workbench.view.extension.saoudrizwan.claude-dev-ActivityBar.enabled",
+			when: "viewContainer.workbench.view.extension.rikaaa0928.rikline-ActivityBar.enabled",
 		},
 	]
 	fs.writeFileSync(keybindingsPath, JSON.stringify(keybindings, null, 2))
@@ -137,10 +137,10 @@ export async function spawnVSCode(workspacePath: string, vsixPath?: string): Pro
 		workspacePath,
 		// Force the extension to be activated on startup
 		"--start-up-extension",
-		"saoudrizwan.claude-dev",
+		"rikaaa0928.rikline",
 		// Run a command on startup to open Cline
 		"--command",
-		"workbench.view.extension.saoudrizwan.claude-dev-ActivityBar",
+		"workbench.view.extension.rikaaa0928.rikline-ActivityBar",
 		// Additional flags to help with extension activation
 		"--disable-gpu=false",
 		"--max-memory=4096",
@@ -152,7 +152,7 @@ export async function spawnVSCode(workspacePath: string, vsixPath?: string): Pro
 		// This script will be executed when VS Code starts
 		setTimeout(() => {
 			// Try to open Cline in the sidebar
-			require('vscode').commands.executeCommand('workbench.view.extension.saoudrizwan.claude-dev-ActivityBar');
+			require('vscode').commands.executeCommand('workbench.view.extension.rikaaa0928.rikline-ActivityBar');
 			
 			// Also try to open Cline in a tab as a fallback
 			setTimeout(() => {
@@ -236,7 +236,7 @@ export async function spawnVSCode(workspacePath: string, vsixPath?: string): Pro
 				let disposable = vscode.commands.registerCommand('cline-activator.activate', async function () {
 					try {
 						// Make sure the Cline extension is activated
-						const extension = vscode.extensions.getExtension('saoudrizwan.claude-dev');
+						const extension = vscode.extensions.getExtension('rikaaa0928.rikline');
 						if (!extension) {
 							console.error('Cline extension not found');
 							return;
@@ -249,7 +249,7 @@ export async function spawnVSCode(workspacePath: string, vsixPath?: string): Pro
 						
 						// Show the Cline sidebar
 						console.log('Opening Cline sidebar...');
-						await vscode.commands.executeCommand('workbench.view.extension.saoudrizwan.claude-dev-ActivityBar');
+						await vscode.commands.executeCommand('workbench.view.extension.rikaaa0928.rikline-ActivityBar');
 						
 						// Wait a moment for the sidebar to initialize
 						await new Promise(resolve => setTimeout(resolve, 2000));
