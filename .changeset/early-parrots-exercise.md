@@ -2,4 +2,4 @@
 "claude-dev": minor
 ---
 
-update prompt for new task
+add smol command
