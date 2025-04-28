@@ -32,8 +32,8 @@ export class VertexHandler implements ApiHandler {
 		this.clientVertex = new VertexAI({
 			project: this.options.vertexProjectId,
 			location: this.options.vertexRegion,
-			// 如果提供了 baseUrl，则将其用作 apiEndpoint
-			apiEndpoint: this.options.vertexBaseUrl,
+			// 如果提供了 baseUrl，则将其用作 apiEndpoint (移除 http:// 或 https:// schema)
+			apiEndpoint: this.options.vertexBaseUrl?.replace(/^https?:\/\//, ""),
 		})
 	}
 
