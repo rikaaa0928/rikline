@@ -1,7 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import axios from "axios"
 import type { AxiosRequestConfig } from "axios"
-import crypto from "crypto"
+
 import fs from "fs/promises"
 import { setTimeout as setTimeoutPromise } from "node:timers/promises"
 import pWaitFor from "p-wait-for"
@@ -12,7 +12,6 @@ import { buildApiHandler } from "@api/index"
 import { cleanupLegacyCheckpoints } from "@integrations/checkpoints/CheckpointMigration"
 import { downloadTask } from "@integrations/misc/export-markdown"
 import { fetchOpenGraphData, isImageUrl } from "@integrations/misc/link-preview"
-import { openImage } from "@integrations/misc/open-file"
 import { handleFileServiceRequest } from "./file"
 import { selectImages } from "@integrations/misc/process-images"
 import { getTheme } from "@integrations/theme/getTheme"
@@ -311,22 +310,6 @@ export class Controller {
 					}
 				}
 				break
-			case "browserSettings":
-				if (message.browserSettings) {
-					// remoteBrowserEnabled now means "enable remote browser connection"
-					// commenting out since this is being done in BrowserSettingsSection updateRemoteBrowserEnabled
-					// if (!message.browserSettings.remoteBrowserEnabled) {
-					// 	// If disabling remote browser connection, clear the remoteBrowserHost
-					// 	message.browserSettings.remoteBrowserHost = undefined
-					// }
-					await updateGlobalState(this.context, "browserSettings", message.browserSettings)
-					if (this.task) {
-						this.task.browserSettings = message.browserSettings
-						this.task.browserSession.browserSettings = message.browserSettings
-					}
-					await this.postStateToWebview()
-				}
-				break
 			case "togglePlanActMode":
 				if (message.chatSettings) {
 					await this.togglePlanActModeWithChatSettings(message.chatSettings, message.chatContent)
@@ -409,9 +392,6 @@ export class Controller {
 				await refreshClineRulesToggles(this.context, cwd)
 				await this.postStateToWebview()
 				break
-			case "openImage":
-				openImage(message.text!)
-				break
 			case "openInBrowser":
 				if (message.url) {
 					vscode.env.openExternal(vscode.Uri.parse(message.url))
@@ -465,23 +445,6 @@ export class Controller {
 			case "getLatestState":
 				await this.postStateToWebview()
 				break
-			case "accountLoginClicked": {
-				// Generate nonce for state validation
-				const nonce = crypto.randomBytes(32).toString("hex")
-				await storeSecret(this.context, "authNonce", nonce)
-
-				// Open browser for authentication with state param
-				console.log("Login button clicked in account page")
-				console.log("Opening auth page with state param")
-
-				const uriScheme = vscode.env.uriScheme
-
-				const authUrl = vscode.Uri.parse(
-					`https://app.cline.bot/auth?state=${encodeURIComponent(nonce)}&callback_url=${encodeURIComponent(`${uriScheme || "vscode"}://rikaaa0928.rikline/auth`)}`,
-				)
-				vscode.env.openExternal(authUrl)
-				break
-			}
 			case "accountLogoutClicked": {
 				await this.handleSignOut()
 				break
@@ -732,21 +695,6 @@ export class Controller {
 				this.postMessageToWebview({ type: "relinquishControl" })
 				break
 			}
-			case "getDetectedChromePath": {
-				try {
-					const { browserSettings } = await getAllExtensionState(this.context)
-					const browserSession = new BrowserSession(this.context, browserSettings)
-					const { path, isBundled } = await browserSession.getDetectedChromePath()
-					await this.postMessageToWebview({
-						type: "detectedChromePath",
-						text: path,
-						isBundled,
-					})
-				} catch (error) {
-					console.error("Error getting detected Chrome path:", error)
-				}
-				break
-			}
 			case "getRelativePaths": {
 				if (message.uris && message.uris.length > 0) {
 					const resolvedPaths = await Promise.all(
@@ -850,6 +798,15 @@ export class Controller {
 			case "grpc_request": {
 				if (message.grpc_request) {
 					await handleGrpcRequest(this, message.grpc_request)
+				}
+				break
+			}
+
+			case "copyToClipboard": {
+				try {
+					await vscode.env.clipboard.writeText(message.text || "")
+				} catch (error) {
+					console.error("Error copying to clipboard:", error)
 				}
 				break
 			}
@@ -1501,6 +1458,14 @@ Here is the project's README to help you get started:\n\n${mcpDetails.readmeCont
 							modelInfo.inputPrice = 0
 							modelInfo.cacheWritesPrice = 0.14
 							modelInfo.cacheReadsPrice = 0.014
+							break
+						case "google/gemini-2.5-pro-preview-03-25":
+						case "google/gemini-2.0-flash-001":
+						case "google/gemini-flash-1.5":
+						case "google/gemini-pro-1.5":
+							modelInfo.supportsPromptCache = true
+							modelInfo.cacheWritesPrice = parsePrice(rawModel.pricing?.input_cache_write)
+							modelInfo.cacheReadsPrice = parsePrice(rawModel.pricing?.input_cache_read)
 							break
 					}
 

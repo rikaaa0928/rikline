@@ -24,7 +24,6 @@ export interface WebviewMessage {
 		| "resetState"
 		| "requestOllamaModels"
 		| "requestLmStudioModels"
-		| "openImage"
 		| "openInBrowser"
 		| "createRuleFile"
 		| "openMention"
@@ -37,7 +36,6 @@ export interface WebviewMessage {
 		| "restartMcpServer"
 		| "deleteMcpServer"
 		| "autoApprovalSettings"
-		| "browserSettings"
 		| "browserRelaunchResult"
 		| "togglePlanActMode"
 		| "taskCompletionViewChanges"
@@ -45,7 +43,6 @@ export interface WebviewMessage {
 		| "requestVsCodeLmModels"
 		| "toggleToolAutoApprove"
 		| "getLatestState"
-		| "accountLoginClicked"
 		| "accountLogoutClicked"
 		| "showAccountViewClicked"
 		| "authStateChanged"
@@ -68,8 +65,6 @@ export interface WebviewMessage {
 		| "requestTotalTasksSize"
 		| "relaunchChromeDebugMode"
 		| "taskFeedback"
-		| "getDetectedChromePath"
-		| "detectedChromePath"
 		| "scrollToSettings"
 		| "getRelativePaths" // Handles single and multiple URI resolution
 		| "searchFiles"
@@ -77,6 +72,7 @@ export interface WebviewMessage {
 		| "grpc_request"
 		| "toggleClineRule"
 		| "deleteClineRule"
+		| "copyToClipboard"
 
 	// | "relaunchChromeDebugMode"
 	text?: string
