@@ -1,6 +1,12 @@
 import type { Anthropic } from "@anthropic-ai/sdk"
 // Restore GenerateContentConfig import and add GenerateContentResponseUsageMetadata
-import { GoogleGenAI, type Content, type GenerateContentConfig, type GenerateContentResponseUsageMetadata } from "@google/genai"
+import {
+	GoogleGenAI,
+	type Content,
+	type GenerateContentConfig,
+	type GenerateContentResponseUsageMetadata,
+	HttpOptions,
+} from "@google/genai"
 import NodeCache from "node-cache"
 import { withRetry } from "../retry"
 import { ApiHandler } from "../"
@@ -36,7 +42,7 @@ interface GeminiHandlerOptions extends ApiHandlerOptions {
  * 4. Separating immediate costs from ongoing costs to avoid double-counting
  */
 export class GeminiHandler implements ApiHandler {
-	private options: ApiHandlerOptions
+	private options: GeminiHandlerOptions
 	private client: GoogleGenAI
 
 	// Enhanced caching system
@@ -124,7 +130,12 @@ export class GeminiHandler implements ApiHandler {
 		if (isCacheAvailable) {
 			// Check if we already have a cache for this task
 			const existingCacheName = this.taskCacheNames.get(taskId)
-			const cacheEntry = existingCacheName ? this.contentCaches.get<{ key: string; count: number }>(taskId) : undefined
+			const cacheEntry = existingCacheName
+				? this.contentCaches.get<{
+						key: string
+						count: number
+					}>(taskId)
+				: undefined
 
 			if (cacheEntry) {
 				// Use existing cache
@@ -148,11 +159,21 @@ export class GeminiHandler implements ApiHandler {
 		// Configure thinking budget if supported
 		const thinkingBudget = this.options.thinkingBudgetTokens ?? 0
 		const maxBudget = info.thinkingConfig?.maxBudget ?? 0
+		let httpOptions: HttpOptions | undefined = undefined
 
+		if (this.options.isVertex && this.options.vertexBaseUrl) {
+			httpOptions = {
+				baseUrl: this.options.vertexBaseUrl,
+			}
+		} else if (!this.options.isVertex && this.options.geminiBaseUrl) {
+			httpOptions = {
+				baseUrl: this.options.geminiBaseUrl,
+			}
+		}
 		// Set up base generation config
 		const requestConfig: GenerateContentConfig = {
 			// Add base URL if configured
-			httpOptions: this.options.geminiBaseUrl ? { baseUrl: this.options.geminiBaseUrl } : undefined,
+			httpOptions: httpOptions,
 
 			// Only include systemInstruction if NOT using the cache
 			...(isCacheUsed ? {} : { systemInstruction: systemPrompt }),

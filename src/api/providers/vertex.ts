@@ -23,7 +23,6 @@ export class VertexHandler implements ApiHandler {
 			process.env.GOOGLE_APPLICATION_CREDENTIALS = options.vertexCredentialsPath
 		}
 
-
 		// Create a GeminiHandler with isVertex flag for Gemini models
 		this.geminiHandler = new GeminiHandler({
 			...options,
