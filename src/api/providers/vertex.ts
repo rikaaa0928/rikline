@@ -27,7 +27,12 @@ export class VertexHandler implements ApiHandler {
 			projectId: this.options.vertexProjectId,
 			// https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude#regions
 			region: this.options.vertexRegion,
-			baseURL: options.vertexBaseUrl,
+			// If vertexBaseUrl exists, append /v1 if it doesn't end with /
+			baseURL: this.options.vertexBaseUrl
+				? this.options.vertexBaseUrl.endsWith("/")
+					? `${this.options.vertexBaseUrl}v1`
+					: `${this.options.vertexBaseUrl}/v1`
+				: undefined,
 		})
 		this.clientVertex = new VertexAI({
 			project: this.options.vertexProjectId,
