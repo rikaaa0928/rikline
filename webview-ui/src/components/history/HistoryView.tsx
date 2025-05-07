@@ -48,7 +48,7 @@ const HistoryView = ({ onDone }: HistoryViewProps) => {
 	}, [searchQuery, sortOption, lastNonRelevantSort])
 
 	const handleShowTaskWithId = useCallback((id: string) => {
-		vscode.postMessage({ type: "showTaskWithId", text: id })
+		TaskServiceClient.showTaskWithId({ value: id }).catch((error) => console.error("Error showing task:", error))
 	}, [])
 
 	const handleHistorySelect = useCallback((itemId: string, checked: boolean) => {
@@ -563,7 +563,7 @@ const ExportButton = ({ itemId }: { itemId: string }) => (
 		appearance="icon"
 		onClick={(e) => {
 			e.stopPropagation()
-			vscode.postMessage({ type: "exportTaskWithId", text: itemId })
+			TaskServiceClient.exportTaskWithId({ value: itemId }).catch((err) => console.error("Failed to export task:", err))
 		}}>
 		<div style={{ fontSize: "11px", fontWeight: 500, opacity: 1 }}>EXPORT</div>
 	</VSCodeButton>
