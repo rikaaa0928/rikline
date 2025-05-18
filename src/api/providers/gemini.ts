@@ -7,7 +7,7 @@ import {
 	type GenerateContentResponseUsageMetadata,
 	HttpOptions,
 } from "@google/genai"
-import NodeCache from "node-cache"
+// import NodeCache from "node-cache"
 import { withRetry } from "../retry"
 import { ApiHandler } from "../"
 import { ApiHandlerOptions, geminiDefaultModelId, GeminiModelId, geminiModels, ModelInfo } from "@shared/api"

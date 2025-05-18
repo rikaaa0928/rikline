@@ -5,8 +5,8 @@ import { ApiHandler } from "../"
 import { ApiHandlerOptions, ModelInfo, vertexDefaultModelId, VertexModelId, vertexModels } from "@shared/api"
 import { ApiStream } from "@api/transform/stream"
 import { GeminiHandler } from "./gemini"
-import { VertexAI } from "@google-cloud/vertexai"
-import { calculateApiCostOpenAI } from "@utils/cost"
+// import { VertexAI } from "@google-cloud/vertexai"
+// import { calculateApiCostOpenAI } from "@utils/cost"
 import process from "node:process" // 导入 process
 
 export class VertexHandler implements ApiHandler {
