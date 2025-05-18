@@ -57,9 +57,10 @@ import { DEFAULT_LANGUAGE_SETTINGS, getLanguageKey, LanguageDisplay } from "@sha
 import { ClineAskResponse, ClineCheckpointRestore } from "@shared/WebviewMessage"
 import { calculateApiCostAnthropic } from "@utils/cost"
 import { fileExistsAtPath } from "@utils/fs"
+import { createAndOpenGitHubIssue } from "@utils/github-url-utils"
 import { arePathsEqual, getReadablePath, isLocatedInWorkspace } from "@utils/path"
 import { fixModelHtmlEscaping, removeInvalidChars } from "@utils/string"
-import { AssistantMessageContent, parseAssistantMessage, ToolParamName, ToolUseName } from "@core/assistant-message"
+import { AssistantMessageContent, parseAssistantMessageV2, ToolParamName, ToolUseName } from "@core/assistant-message"
 import { constructNewFileContent } from "@core/assistant-message/diff"
 import { ClineIgnoreController } from "@core/ignore/ClineIgnoreController"
 import { parseMentions } from "@core/mentions"
@@ -79,6 +80,7 @@ import {
 	ensureTaskDirectoryExists,
 	getSavedApiConversationHistory,
 	getSavedClineMessages,
+	GlobalFileNames,
 	saveApiConversationHistory,
 	saveClineMessages,
 } from "@core/storage/disk"
@@ -86,13 +88,14 @@ import {
 	getGlobalClineRules,
 	getLocalClineRules,
 	refreshClineRulesToggles,
-	ensureLocalClinerulesDirExists,
 } from "@core/context/instructions/user-instructions/cline-rules"
+import { ensureLocalClineDirExists } from "../context/instructions/user-instructions/rule-helpers"
 import {
 	refreshExternalRulesToggles,
 	getLocalWindsurfRules,
 	getLocalCursorRules,
 } from "@core/context/instructions/user-instructions/external-rules"
+import { refreshWorkflowToggles } from "../context/instructions/user-instructions/workflows"
 import { getGlobalState } from "@core/storage/state"
 import { parseSlashCommands } from "@core/slash-commands"
 import WorkspaceTracker from "@integrations/workspace/WorkspaceTracker"
@@ -118,6 +121,7 @@ export class Task {
 	private cancelTask: () => Promise<void>
 
 	readonly taskId: string
+	private taskIsFavorited?: boolean
 	api: ApiHandler
 	private terminalManager: TerminalManager
 	private urlContentFetcher: UrlContentFetcher
@@ -165,6 +169,7 @@ export class Task {
 	private didAlreadyUseTool = false
 	private didCompleteReadingStream = false
 	private didAutomaticallyRetryFailedApiRequest = false
+	private enableCheckpoints: boolean
 
 	constructor(
 		context: vscode.ExtensionContext,
@@ -180,6 +185,7 @@ export class Task {
 		browserSettings: BrowserSettings,
 		chatSettings: ChatSettings,
 		shellIntegrationTimeout: number,
+		enableCheckpointsSetting: boolean,
 		customInstructions?: string,
 		task?: string,
 		images?: string[],
@@ -194,9 +200,7 @@ export class Task {
 		this.reinitExistingTaskFromId = reinitExistingTaskFromId
 		this.cancelTask = cancelTask
 		this.clineIgnoreController = new ClineIgnoreController(cwd)
-		this.clineIgnoreController.initialize().catch((error) => {
-			console.error("Failed to initialize ClineIgnoreController:", error)
-		})
+		// Initialization moved to startTask/resumeTaskFromHistory
 		this.terminalManager = new TerminalManager()
 		this.terminalManager.setShellIntegrationTimeout(shellIntegrationTimeout)
 		this.urlContentFetcher = new UrlContentFetcher(context)
@@ -207,10 +211,12 @@ export class Task {
 		this.autoApprovalSettings = autoApprovalSettings
 		this.browserSettings = browserSettings
 		this.chatSettings = chatSettings
+		this.enableCheckpoints = enableCheckpointsSetting
 
 		// Initialize taskId first
 		if (historyItem) {
 			this.taskId = historyItem.id
+			this.taskIsFavorited = historyItem.isFavorited
 			this.conversationHistoryDeletedRange = historyItem.conversationHistoryDeletedRange
 		} else if (task || images) {
 			this.taskId = Date.now().toString()
@@ -221,11 +227,50 @@ export class Task {
 		// Initialize file context tracker
 		this.fileContextTracker = new FileContextTracker(context, this.taskId)
 		this.modelContextTracker = new ModelContextTracker(context, this.taskId)
-		// Now that taskId is initialized, we can build the API handler
-		this.api = buildApiHandler({
+
+		// Prepare effective API configuration
+		let effectiveApiConfiguration: ApiConfiguration = {
 			...apiConfiguration,
 			taskId: this.taskId,
-		})
+			onRetryAttempt: (attempt: number, maxRetries: number, delay: number, error: any) => {
+				const lastApiReqStartedIndex = findLastIndex(this.clineMessages, (m) => m.say === "api_req_started")
+				if (lastApiReqStartedIndex !== -1) {
+					try {
+						const currentApiReqInfo: ClineApiReqInfo = JSON.parse(
+							this.clineMessages[lastApiReqStartedIndex].text || "{}",
+						)
+						currentApiReqInfo.retryStatus = {
+							attempt: attempt, // attempt is already 1-indexed from retry.ts
+							maxAttempts: maxRetries, // total attempts
+							delaySec: Math.round(delay / 1000),
+							errorSnippet: error?.message ? `${String(error.message).substring(0, 50)}...` : undefined,
+						}
+						// Clear previous cancelReason and streamingFailedMessage if we are retrying
+						delete currentApiReqInfo.cancelReason
+						delete currentApiReqInfo.streamingFailedMessage
+						this.clineMessages[lastApiReqStartedIndex].text = JSON.stringify(currentApiReqInfo)
+
+						// Post the updated state to the webview so the UI reflects the retry attempt
+						this.postStateToWebview().catch((e) =>
+							console.error("Error posting state to webview in onRetryAttempt:", e),
+						)
+
+						console.log(
+							`[Task ${this.taskId}] API Auto-Retry Status Update: Attempt ${attempt}/${maxRetries}, Delay: ${delay}ms`,
+						)
+					} catch (e) {
+						console.error(`[Task ${this.taskId}] Error updating api_req_started with retryStatus:`, e)
+					}
+				}
+			},
+		}
+
+		if (apiConfiguration.apiProvider === "openai" || apiConfiguration.apiProvider === "openai-native") {
+			effectiveApiConfiguration.reasoningEffort = chatSettings.openAIReasoningEffort
+		}
+
+		// Now that taskId is initialized, we can build the API handler
+		this.api = buildApiHandler(effectiveApiConfiguration)
 
 		// Set taskId on browserSession for telemetry tracking
 		this.browserSession.setTaskId(this.taskId)
@@ -313,7 +358,9 @@ export class Task {
 				totalCost: apiMetrics.totalCost,
 				size: taskDirSize,
 				shadowGitConfigWorkTree: await this.checkpointTracker?.getShadowGitConfigWorkTree(),
+				cwdOnTaskInitialization: cwd,
 				conversationHistoryDeletedRange: this.conversationHistoryDeletedRange,
+				isFavorited: this.taskIsFavorited,
 			})
 		} catch (error) {
 			console.error("Failed to save cline messages:", error)
@@ -339,9 +386,19 @@ export class Task {
 				break
 			case "taskAndWorkspace":
 			case "workspace":
+				if (!this.enableCheckpoints) {
+					vscode.window.showErrorMessage("Checkpoints are disabled in settings.")
+					didWorkspaceRestoreFail = true
+					break
+				}
+
 				if (!this.checkpointTracker && !this.checkpointTrackerErrorMessage) {
 					try {
-						this.checkpointTracker = await CheckpointTracker.create(this.taskId, this.context.globalStorageUri.fsPath)
+						this.checkpointTracker = await CheckpointTracker.create(
+							this.taskId,
+							this.context.globalStorageUri.fsPath,
+							this.enableCheckpoints,
+						)
 					} catch (error) {
 						const errorMessage = error instanceof Error ? error.message : "Unknown error"
 						console.error("Failed to initialize checkpoint tracker:", errorMessage)
@@ -448,6 +505,11 @@ export class Task {
 		const relinquishButton = () => {
 			this.postMessageToWebview({ type: "relinquishControl" })
 		}
+		if (!this.enableCheckpoints) {
+			vscode.window.showInformationMessage("Checkpoints are disabled in settings. Cannot show diff.")
+			relinquishButton()
+			return
+		}
 
 		console.log("presentMultifileDiff", messageTs)
 		const messageIndex = this.clineMessages.findIndex((m) => m.ts === messageTs)
@@ -465,9 +527,13 @@ export class Task {
 		}
 
 		// TODO: handle if this is called from outside original workspace, in which case we need to show user error message we can't show diff outside of workspace?
-		if (!this.checkpointTracker && !this.checkpointTrackerErrorMessage) {
+		if (!this.checkpointTracker && this.enableCheckpoints && !this.checkpointTrackerErrorMessage) {
 			try {
-				this.checkpointTracker = await CheckpointTracker.create(this.taskId, this.context.globalStorageUri.fsPath)
+				this.checkpointTracker = await CheckpointTracker.create(
+					this.taskId,
+					this.context.globalStorageUri.fsPath,
+					this.enableCheckpoints,
+				)
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error"
 				console.error("Failed to initialize checkpoint tracker:", errorMessage)
@@ -565,6 +631,10 @@ export class Task {
 	}
 
 	async doesLatestTaskCompletionHaveNewChanges() {
+		if (!this.enableCheckpoints) {
+			return false
+		}
+
 		const messageIndex = findLastIndex(this.clineMessages, (m) => m.say === "completion_result")
 		const message = this.clineMessages[messageIndex]
 		if (!message) {
@@ -577,9 +647,13 @@ export class Task {
 			return false
 		}
 
-		if (!this.checkpointTracker && !this.checkpointTrackerErrorMessage) {
+		if (this.enableCheckpoints && !this.checkpointTracker && !this.checkpointTrackerErrorMessage) {
 			try {
-				this.checkpointTracker = await CheckpointTracker.create(this.taskId, this.context.globalStorageUri.fsPath)
+				this.checkpointTracker = await CheckpointTracker.create(
+					this.taskId,
+					this.context.globalStorageUri.fsPath,
+					this.enableCheckpoints,
+				)
 			} catch (error) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error"
 				console.error("Failed to initialize checkpoint tracker:", errorMessage)
@@ -853,6 +927,12 @@ export class Task {
 	// Task lifecycle
 
 	private async startTask(task?: string, images?: string[]): Promise<void> {
+		try {
+			await this.clineIgnoreController.initialize()
+		} catch (error) {
+			console.error("Failed to initialize ClineIgnoreController:", error)
+			// Optionally, inform the user or handle the error appropriately
+		}
 		// conversationHistory (for API) and clineMessages (for webview) need to be in sync
 		// if the extension process were killed, then on restart the clineMessages might not be empty, so we need to set it to [] when we create a new Cline client (otherwise webview would show stale messages from previous session)
 		this.clineMessages = []
@@ -875,6 +955,12 @@ export class Task {
 	}
 
 	private async resumeTaskFromHistory() {
+		try {
+			await this.clineIgnoreController.initialize()
+		} catch (error) {
+			console.error("Failed to initialize ClineIgnoreController:", error)
+			// Optionally, inform the user or handle the error appropriately
+		}
 		// UPDATE: we don't need this anymore since most tasks are now created with checkpoints enabled
 		// right now we let users init checkpoints for old tasks, assuming they're continuing them from the same workspace (which we never tied to tasks, so no way for us to know if it's opened in the right workspace)
 		// const doesShadowGitExist = await CheckpointTracker.doesShadowGitExist(this.taskId, this.controllerRef.deref())
@@ -1066,6 +1152,10 @@ export class Task {
 	// Checkpoints
 
 	async saveCheckpoint(isAttemptCompletionMessage: boolean = false) {
+		if (!this.enableCheckpoints) {
+			// If checkpoints are disabled, do nothing.
+			return
+		}
 		// Set isCheckpointCheckedOut to false for all checkpoint_created messages
 		this.clineMessages.forEach((message) => {
 			if (message.say === "checkpoint_created") {
@@ -1428,13 +1518,38 @@ export class Task {
 		return statusCode && !message.includes(statusCode.toString()) ? `${statusCode} - ${message}` : message
 	}
 
+	/**
+	 * Migrates the disableBrowserTool setting from VSCode configuration to browserSettings
+	 */
+	private async migrateDisableBrowserToolSetting(): Promise<void> {
+		const config = vscode.workspace.getConfiguration("cline")
+		const disableBrowserTool = config.get<boolean>("disableBrowserTool")
+
+		if (disableBrowserTool !== undefined) {
+			this.browserSettings.disableToolUse = disableBrowserTool
+			// Remove from VSCode configuration
+			await config.update("disableBrowserTool", undefined, true)
+		}
+	}
+
+	private async migratePreferredLanguageToolSetting(): Promise<void> {
+		const config = vscode.workspace.getConfiguration("cline")
+		const preferredLanguage = config.get<LanguageDisplay>("preferredLanguage")
+		if (preferredLanguage !== undefined) {
+			this.chatSettings.preferredLanguage = preferredLanguage
+			// Remove from VSCode configuration
+			await config.update("preferredLanguage", undefined, true)
+		}
+	}
+
 	async *attemptApiRequest(previousApiReqIndex: number): ApiStream {
 		// Wait for MCP servers to be connected before generating system prompt
 		await pWaitFor(() => this.mcpHub.isConnecting !== true, { timeout: 10_000 }).catch(() => {
 			console.error("MCP servers failed to connect in time")
 		})
 
-		const disableBrowserTool = vscode.workspace.getConfiguration("cline").get<boolean>("disableBrowserTool") ?? false
+		await this.migrateDisableBrowserToolSetting()
+		const disableBrowserTool = this.browserSettings.disableToolUse ?? false
 		// cline browser tool uses image recognition for navigation (requires model image support).
 		const modelSupportsBrowserUse = this.api.getModel().info.supportsImages ?? false
 
@@ -1443,9 +1558,8 @@ export class Task {
 		let systemPrompt = await SYSTEM_PROMPT(cwd, supportsBrowserUse, this.mcpHub, this.browserSettings)
 
 		let settingsCustomInstructions = this.customInstructions?.trim()
-		const preferredLanguage = getLanguageKey(
-			vscode.workspace.getConfiguration("cline").get<LanguageDisplay>("preferredLanguage"),
-		)
+		await this.migratePreferredLanguageToolSetting()
+		const preferredLanguage = getLanguageKey(this.chatSettings.preferredLanguage as LanguageDisplay)
 		const preferredLanguageInstructions =
 			preferredLanguage && preferredLanguage !== DEFAULT_LANGUAGE_SETTINGS
 				? `# Preferred Language\n\nSpeak in ${preferredLanguage}.`
@@ -1572,6 +1686,20 @@ export class Task {
 				}
 
 				const errorMessage = this.formatErrorWithStatusCode(error)
+
+				// Update the 'api_req_started' message to reflect final failure before asking user to manually retry
+				const lastApiReqStartedIndex = findLastIndex(this.clineMessages, (m) => m.say === "api_req_started")
+				if (lastApiReqStartedIndex !== -1) {
+					const currentApiReqInfo: ClineApiReqInfo = JSON.parse(this.clineMessages[lastApiReqStartedIndex].text || "{}")
+					delete currentApiReqInfo.retryStatus
+
+					this.clineMessages[lastApiReqStartedIndex].text = JSON.stringify({
+						...currentApiReqInfo, // Spread the modified info (with retryStatus removed)
+						cancelReason: "retries_exhausted", // Indicate that automatic retries failed
+						streamingFailedMessage: errorMessage,
+					} satisfies ClineApiReqInfo)
+					// this.ask will trigger postStateToWebview, so this change should be picked up.
+				}
 
 				const { response } = await this.ask("api_req_failed", errorMessage)
 
@@ -1710,6 +1838,8 @@ export class Task {
 						case "new_task":
 							return `[${block.name} for creating a new task]`
 						case "condense":
+							return `[${block.name}]`
+						case "report_bug":
 							return `[${block.name}]`
 						case "new_rule":
 							return `[${block.name} for '${block.params.path}']`
@@ -1916,7 +2046,7 @@ export class Task {
 											: "other_diff_error"
 
 									// Add telemetry for diff edit failure
-									telemetryService.captureDiffEditFailure(this.taskId, errorType)
+									telemetryService.captureDiffEditFailure(this.taskId, this.api.getModel().id, errorType)
 
 									pushToolResult(
 										formatResponse.toolError(
@@ -3141,6 +3271,135 @@ export class Task {
 							break
 						}
 					}
+					case "report_bug": {
+						const title = block.params.title
+						const what_happened = block.params.what_happened
+						const steps_to_reproduce = block.params.steps_to_reproduce
+						const api_request_output = block.params.api_request_output
+						const additional_context = block.params.additional_context
+
+						try {
+							if (block.partial) {
+								await this.ask(
+									"report_bug",
+									JSON.stringify({
+										title: removeClosingTag("title", title),
+										what_happened: removeClosingTag("what_happened", what_happened),
+										steps_to_reproduce: removeClosingTag("steps_to_reproduce", steps_to_reproduce),
+										api_request_output: removeClosingTag("api_request_output", api_request_output),
+										additional_context: removeClosingTag("additional_context", additional_context),
+									}),
+									block.partial,
+								).catch(() => {})
+								break
+							} else {
+								if (!title) {
+									this.consecutiveMistakeCount++
+									pushToolResult(await this.sayAndCreateMissingParamError("report_bug", "title"))
+									await this.saveCheckpoint()
+									break
+								}
+								if (!what_happened) {
+									this.consecutiveMistakeCount++
+									pushToolResult(await this.sayAndCreateMissingParamError("report_bug", "what_happened"))
+									await this.saveCheckpoint()
+									break
+								}
+								if (!steps_to_reproduce) {
+									this.consecutiveMistakeCount++
+									pushToolResult(await this.sayAndCreateMissingParamError("report_bug", "steps_to_reproduce"))
+									await this.saveCheckpoint()
+									break
+								}
+								if (!api_request_output) {
+									this.consecutiveMistakeCount++
+									pushToolResult(await this.sayAndCreateMissingParamError("report_bug", "api_request_output"))
+									await this.saveCheckpoint()
+									break
+								}
+								if (!additional_context) {
+									this.consecutiveMistakeCount++
+									pushToolResult(await this.sayAndCreateMissingParamError("report_bug", "additional_context"))
+									await this.saveCheckpoint()
+									break
+								}
+
+								this.consecutiveMistakeCount = 0
+
+								if (this.autoApprovalSettings.enabled && this.autoApprovalSettings.enableNotifications) {
+									showSystemNotification({
+										subtitle: "Cline wants to create a github issue...",
+										message: `Cline is suggesting to create a github issue with the title: ${title}`,
+									})
+								}
+
+								// Derive system information values algorithmically
+								const operatingSystem = os.platform() + " " + os.release()
+								const clineVersion =
+									vscode.extensions.getExtension("saoudrizwan.claude-dev")?.packageJSON.version || "Unknown"
+								const systemInfo = `VSCode: ${vscode.version}, Node.js: ${process.version}, Architecture: ${os.arch()}`
+								const providerAndModel = `${(await getGlobalState(this.getContext(), "apiProvider")) as string} / ${this.api.getModel().id}`
+
+								// Ask user for confirmation
+								const bugReportData = JSON.stringify({
+									title,
+									what_happened,
+									steps_to_reproduce,
+									api_request_output,
+									additional_context,
+									// Include derived values in the JSON for display purposes
+									provider_and_model: providerAndModel,
+									operating_system: operatingSystem,
+									system_info: systemInfo,
+									cline_version: clineVersion,
+								})
+
+								const { text, images } = await this.ask("report_bug", bugReportData, false)
+
+								// If the user provided a response, treat it as feedback
+								if (text || images?.length) {
+									await this.say("user_feedback", text ?? "", images)
+									pushToolResult(
+										formatResponse.toolResult(
+											`The user did not submit the bug, and provided feedback on the Github issue generated instead:\n<feedback>\n${text}\n</feedback>`,
+											images,
+										),
+									)
+								} else {
+									// If no response, the user accepted the condensed version
+									pushToolResult(
+										formatResponse.toolResult(`The user accepted the creation of the Github issue.`),
+									)
+
+									try {
+										// Create a Map of parameters for the GitHub issue
+										const params = new Map<string, string>()
+										params.set("title", title)
+										params.set("operating-system", operatingSystem)
+										params.set("cline-version", clineVersion)
+										params.set("system-info", systemInfo)
+										params.set("additional-context", additional_context)
+										params.set("what-happened", what_happened)
+										params.set("steps", steps_to_reproduce)
+										params.set("provider-model", providerAndModel)
+										params.set("logs", api_request_output)
+
+										// Use our utility function to create and open the GitHub issue URL
+										// This bypasses VS Code's URI handling issues with special characters
+										await createAndOpenGitHubIssue("cline", "cline", "bug_report.yml", params)
+									} catch (error) {
+										console.error(`An error occurred while attempting to report the bug: ${error}`)
+									}
+								}
+								await this.saveCheckpoint()
+								break
+							}
+						} catch (error) {
+							await handleError("reporting bug", error)
+							await this.saveCheckpoint()
+							break
+						}
+					}
 					case "plan_mode_respond": {
 						const response: string | undefined = block.params.response
 						const optionsRaw: string | undefined = block.params.options
@@ -3512,17 +3771,11 @@ export class Task {
 			}),
 		)
 
-		if (isFirstRequest) {
-			await this.say("checkpoint_created") // no hash since we need to wait for CheckpointTracker to be initialized
-		}
-
-		// use this opportunity to initialize the checkpoint tracker (can be expensive to initialize in the constructor)
-		// FIXME: right now we're letting users init checkpoints for old tasks, but this could be a problem if opening a task in the wrong workspace
-		// isNewTask &&
-		if (!this.checkpointTracker && !this.checkpointTrackerErrorMessage) {
+		// Initialize checkpoint tracker first if enabled and it's the first request
+		if (isFirstRequest && this.enableCheckpoints && !this.checkpointTracker && !this.checkpointTrackerErrorMessage) {
 			try {
 				this.checkpointTracker = await pTimeout(
-					CheckpointTracker.create(this.taskId, this.context.globalStorageUri.fsPath),
+					CheckpointTracker.create(this.taskId, this.context.globalStorageUri.fsPath, this.enableCheckpoints),
 					{
 						milliseconds: 15_000,
 						message:
@@ -3536,14 +3789,22 @@ export class Task {
 			}
 		}
 
-		// Now that checkpoint tracker is initialized, update the dummy checkpoint_created message with the commit hash. (This is necessary since we use the API request loading as an opportunity to initialize the checkpoint tracker, which can take some time)
-		if (isFirstRequest) {
-			const commitHash = await this.checkpointTracker?.commit()
+		// Now, if it's the first request AND checkpoints are enabled AND tracker was successfully initialized,
+		// then say "checkpoint_created" and perform the commit.
+		if (isFirstRequest && this.enableCheckpoints && this.checkpointTracker) {
+			await this.say("checkpoint_created") // Now this is conditional
+			const commitHash = await this.checkpointTracker.commit() // Actual commit
 			const lastCheckpointMessage = findLast(this.clineMessages, (m) => m.say === "checkpoint_created")
 			if (lastCheckpointMessage) {
 				lastCheckpointMessage.lastCheckpointHash = commitHash
-				await this.saveClineMessagesAndUpdateHistory()
+				// saveClineMessagesAndUpdateHistory will be called later after API response,
+				// so no need to call it here unless this is the only modification to this message.
+				// For now, assuming it's handled later.
 			}
+		} else if (isFirstRequest && this.enableCheckpoints && !this.checkpointTracker && this.checkpointTrackerErrorMessage) {
+			// Checkpoints are enabled, but tracker failed to initialize.
+			// checkpointTrackerErrorMessage is already set and will be part of the state.
+			// No explicit UI message here, error message will be in ExtensionState.
 		}
 
 		const [parsedUserContent, environmentDetails, clinerulesError] = await this.loadContext(userContent, includeFileDetails)
@@ -3586,8 +3847,11 @@ export class Task {
 			// fortunately api_req_finished was always parsed out for the gui anyways, so it remains solely for legacy purposes to keep track of prices in tasks from history
 			// (it's worth removing a few months from now)
 			const updateApiReqMsg = (cancelReason?: ClineApiReqCancelReason, streamingFailedMessage?: string) => {
+				const currentApiReqInfo: ClineApiReqInfo = JSON.parse(this.clineMessages[lastApiReqIndex].text || "{}")
+				delete currentApiReqInfo.retryStatus // Clear retry status when request is finalized
+
 				this.clineMessages[lastApiReqIndex].text = JSON.stringify({
-					...JSON.parse(this.clineMessages[lastApiReqIndex].text || "{}"),
+					...currentApiReqInfo, // Spread the modified info (with retryStatus removed)
 					tokensIn: inputTokens,
 					tokensOut: outputTokens,
 					cacheWrites: cacheWriteTokens,
@@ -3702,7 +3966,7 @@ export class Task {
 							assistantMessage += chunk.text
 							// parse raw assistant message into content blocks
 							const prevLength = this.assistantMessageContent.length
-							this.assistantMessageContent = parseAssistantMessage(assistantMessage)
+							this.assistantMessageContent = parseAssistantMessageV2(assistantMessage)
 							if (this.assistantMessageContent.length > prevLength) {
 								this.userMessageContentReady = false // new content we need to present, reset to false in case previous content set this to true
 							}
@@ -3856,6 +4120,8 @@ export class Task {
 		// Track if we need to check clinerulesFile
 		let needsClinerulesFileCheck = false
 
+		const workflowToggles = await refreshWorkflowToggles(this.getContext(), cwd)
+
 		const processUserContent = async () => {
 			// This is a temporary solution to dynamically load context mentions from tool results. It checks for the presence of tags that indicate that the tool was rejected and feedback was provided (see formatToolDeniedFeedback, attemptCompletion, executeCommand, and consecutiveMistakeCount >= 3) or "<answer>" (see askFollowupQuestion), we place all user generated content in these tags so they can effectively be used as markers for when we should parse mentions). However if we allow multiple tools responses in the future, we will need to parse mentions specifically within the user content tags.
 			// (Note: this caused the @/ import alias bug where file contents were being parsed as well, since v2 converted tool results to text blocks)
@@ -3878,7 +4144,10 @@ export class Task {
 							)
 
 							// when parsing slash commands, we still want to allow the user to provide their desired context
-							const { processedText, needsClinerulesFileCheck: needsCheck } = parseSlashCommands(parsedText)
+							const { processedText, needsClinerulesFileCheck: needsCheck } = await parseSlashCommands(
+								parsedText,
+								workflowToggles,
+							)
 
 							if (needsCheck) {
 								needsClinerulesFileCheck = true
@@ -3904,7 +4173,7 @@ export class Task {
 		// After processing content, check clinerulesData if needed
 		let clinerulesError = false
 		if (needsClinerulesFileCheck) {
-			clinerulesError = await ensureLocalClinerulesDirExists(cwd)
+			clinerulesError = await ensureLocalClineDirExists(cwd, GlobalFileNames.clineRules)
 		}
 
 		// Return all results

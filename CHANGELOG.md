@@ -1,5 +1,97 @@
 # Changelog
 
+## [3.16.1]
+
+-   Add Enable auto approve toggle switch, allowing users to easily turn auto-approve functionality on or off without losing their action settings
+-   Improve Gemini retry handling with better UI feedback, showing retry progress during API request attempts
+-   Fix memory leak issue that could occur during long sessions with multiple tasks
+-   Improve UI for Gemini model retry attempts with clearer status updates
+-   Fix quick actions functionality in auto-approve settings
+-   Update UI styling for auto-approve menu items to conserve space
+
+## [3.16.0]
+
+-   Add new workflow feature allowing users to create and manage workflow files that can be injected into conversations via slash commands
+-   Add collapsible recent task list, allowing users to hide their task history when sharing their screen (Thanks @cosmix!)
+-   Add global endpoint option for Vertex AI users, providing higher availability and reducing 429 errors (Thanks @soniqua!)
+-   Add detection for new users to display special components and guidance
+-   Add Tailwind CSS IntelliSense to the recommended extensions list
+-   Fix eternal loading states when the last message is a checkpoint (Thanks @BarreiroT!)
+-   Improve settings organization by migrating VSCode Advanced settings to Settings Webview
+
+## [3.15.5]
+
+-   Fix inefficient memory management in the task timeline
+-   Fix Gemini rate limitation response not being handled properly (Thanks @BarreiroT!)
+
+## [3.15.4]
+
+-   Add gemini model back to vertex provider
+-   Add gemini telemetry
+-   Add filtering for tasks tied to the current workspace
+
+## [3.15.3]
+
+-   Add Fireworks API Provider
+-   Fix minor visual issues with auto-approve menu
+-   Fix one instance of terminal not getting output
+-   Fix 'Chrome was launched but debug port is not responding' error
+
+## [3.15.2]
+
+-   Added details to auto approve menu and more sensible default controls
+-   Add detailed configuration options for LiteLLM provider
+-   Add webview telemetry for users who have opted in to telemetry
+-   Update Gemini in OpenRouter/Cline providers to use implicit caching
+-   Fix freezing issues during rendering of large streaming text
+-   Fix grey screen webview crashes by releasing memory after every diff edit
+-   Fix breaking out of diff auto-scroll
+-   Fix IME composition Enter auto‑sending edited message
+
+## [3.15.1]
+
+-   Fix bug where PowerShell commands weren't given enough time before giving up and showing an error
+
+## [3.15.0]
+
+-   Add Task Timeline visualization to tasks (Thanks eomcaleb!)
+-   Add cache to ui for OpenAi provider
+-   Add FeatureFlagProvider service for the Node.js extension side
+-   Add copy buttons to task header and assistant messages
+-   Add a more simplified home header was added
+-   Add ability to favorite a task, allowing it to be kept when clearing all tasks
+-   Add npm script for issue creation (Thanks DaveFres!)
+-   Add confirmation dialog to Delete All History button
+-   Add ability to allow the user to type their next message into the chat while Cline is taking action
+-   Add ability to generate commit message via cline (Thanks zapp88!)
+-   Add improvements to caching for gemini models on OpenRouter and Cline providers
+-   Add improvements to allow scrolling the file being edited.
+-   Add ui for windsurf and cursor rules
+-   Add mistral medium-3 model
+-   Add option to collect events to send them in a bundle to avoid sending too many events
+-   Add support to quote a previous message in chat
+-   Add support for Gemini Implicit Caching
+-   Add support for batch selection and deletion of tasks in history (Thanks danix800!)
+-   Update change suggested models
+-   Update fetch cache details from generation endpoint
+-   Update converted docs to Mintlify
+-   Update the isOminiModel to include o4-mini model (Thanks PeterDaveHello!)
+-   Update file size that can be read by Cline, allowing larger files
+-   Update defaults for bedrock API models (Thanks Watany!)
+-   Update to extend ReasoningEffort to non-o3-mini reasoning models for all providers (Thanks PeterDaveHello!)
+-   Update to give error when a user tries to upload an image larger than 7500x7500 pixels
+-   Update announcement so that previous updates are in a dropdown
+-   Update UI for auto approve with favorited settings
+-   Fix bug where certain terminal commands would lock you out of a task
+-   Fix only initialize posthog in the webview if the user has opted into telemetry
+-   Fix bug where autocapture was on for front-end telemetry
+-   Fix for markdown copy excessively escaping characters (Thanks weshoke!)
+-   Fix an issue where loading never finished when using an application inference profile for the model ID (Thanks WinterYukky!)
+
+## [3.14.1]
+
+-   Disables autocaptures when initializing feature flags
+
 ## [3.14.0]
 
 -   Add support for custom model ID in AWS Bedrock provider, enabling use of Application Inference Profile (Thanks @clicube!)

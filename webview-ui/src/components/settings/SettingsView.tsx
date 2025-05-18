@@ -1,5 +1,14 @@
-import { VSCodeButton, VSCodeCheckbox, VSCodeLink, VSCodeTextArea } from "@vscode/webview-ui-toolkit/react"
+import {
+	VSCodeButton,
+	VSCodeCheckbox,
+	VSCodeDropdown,
+	VSCodeLink,
+	VSCodeOption,
+	VSCodeTextArea,
+} from "@vscode/webview-ui-toolkit/react"
 import { memo, useCallback, useEffect, useState } from "react"
+import PreferredLanguageSetting from "./PreferredLanguageSetting" // Added import
+import { OpenAIReasoningEffort } from "@shared/ChatSettings"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { validateApiConfiguration, validateModelId } from "@/utils/validate"
 import { vscode } from "@/utils/vscode"
@@ -8,9 +17,10 @@ import ApiOptions from "./ApiOptions"
 import { TabButton } from "../mcp/configuration/McpConfigurationView"
 import { useEvent } from "react-use"
 import { ExtensionMessage } from "@shared/ExtensionMessage"
+import { StateServiceClient } from "@/services/grpc-client"
+import FeatureSettingsSection from "./FeatureSettingsSection"
 import BrowserSettingsSection from "./BrowserSettingsSection"
 import TerminalSettingsSection from "./TerminalSettingsSection"
-import { useFeatureFlag } from "@/hooks/useFeatureFlag"
 import { FEATURE_FLAGS } from "@shared/services/feature-flags/feature-flags"
 const { IS_DEV } = process.env
 
@@ -28,8 +38,11 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 		telemetrySetting,
 		setTelemetrySetting,
 		chatSettings,
+		setChatSettings,
 		planActSeparateModelsSetting,
 		setPlanActSeparateModelsSetting,
+		enableCheckpointsSetting,
+		mcpMarketplaceEnabled,
 	} = useExtensionState()
 	const [apiErrorMessage, setApiErrorMessage] = useState<string | undefined>(undefined)
 	const [modelIdErrorMessage, setModelIdErrorMessage] = useState<string | undefined>(undefined)
@@ -68,6 +81,8 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 			planActSeparateModelsSetting,
 			customInstructionsSetting: customInstructions,
 			telemetrySetting,
+			enableCheckpointsSetting,
+			mcpMarketplaceEnabled,
 			apiConfiguration: apiConfigurationToSubmit,
 		})
 
@@ -134,8 +149,12 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 
 	useEvent("message", handleMessage)
 
-	const handleResetState = () => {
-		vscode.postMessage({ type: "resetState" })
+	const handleResetState = async () => {
+		try {
+			await StateServiceClient.resetState({})
+		} catch (error) {
+			console.error("Failed to reset state:", error)
+		}
 	}
 
 	const handleTabChange = (tab: "plan" | "act") => {
@@ -145,8 +164,6 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 		setPendingTabChange(tab)
 		handleSubmit(true)
 	}
-
-	const showCustomInstructions = useFeatureFlag(FEATURE_FLAGS.CUSTOM_INSTRUCTIONS)
 
 	return (
 		<div className="fixed top-0 left-0 right-0 bottom-0 pt-[10px] pr-0 pb-0 pl-5 flex flex-col overflow-hidden">
@@ -186,24 +203,22 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 					/>
 				)}
 
-				{showCustomInstructions && (
-					<div className="mb-[5px]">
-						<VSCodeTextArea
-							value={customInstructions ?? ""}
-							className="w-full"
-							resize="vertical"
-							rows={4}
-							placeholder={
-								'e.g. "Run unit tests at the end", "Use TypeScript with async/await", "Speak in Spanish"'
-							}
-							onInput={(e: any) => setCustomInstructions(e.target?.value ?? "")}>
-							<span className="font-medium">Custom Instructions</span>
-						</VSCodeTextArea>
-						<p className="text-xs mt-[5px] text-[var(--vscode-descriptionForeground)]">
-							These instructions are added to the end of the system prompt sent with every request.
-						</p>
-					</div>
-				)}
+				<div className="mb-[5px]">
+					<VSCodeTextArea
+						value={customInstructions ?? ""}
+						className="w-full"
+						resize="vertical"
+						rows={4}
+						placeholder={'e.g. "Run unit tests at the end", "Use TypeScript with async/await", "Speak in Spanish"'}
+						onInput={(e: any) => setCustomInstructions(e.target?.value ?? "")}>
+						<span className="font-medium">Custom Instructions</span>
+					</VSCodeTextArea>
+					<p className="text-xs mt-[5px] text-[var(--vscode-descriptionForeground)]">
+						These instructions are added to the end of the system prompt sent with every request.
+					</p>
+				</div>
+
+				{chatSettings && <PreferredLanguageSetting chatSettings={chatSettings} setChatSettings={setChatSettings} />}
 
 				<div className="mb-[5px]">
 					<VSCodeCheckbox
@@ -245,20 +260,14 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 					</p>
 				</div>
 
+				{/* Feature Settings Section */}
+				<FeatureSettingsSection />
+
 				{/* Browser Settings Section */}
 				<BrowserSettingsSection />
 
 				{/* Terminal Settings Section */}
 				<TerminalSettingsSection />
-
-				<div className="mt-auto pr-2 flex justify-center">
-					<SettingsButton
-						onClick={() => vscode.postMessage({ type: "openExtensionSettings" })}
-						className="mt-0 mr-0 mb-4 ml-0">
-						<i className="codicon codicon-settings-gear" />
-						Advanced Settings
-					</SettingsButton>
-				</div>
 
 				{IS_DEV && (
 					<>
