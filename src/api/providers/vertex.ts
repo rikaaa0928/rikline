@@ -169,7 +169,7 @@ export class VertexHandler implements ApiHandler {
 		}
 
 		for await (const chunk of stream) {
-			switch (chunk.type) {
+			switch (chunk?.type) {
 				case "message_start":
 					const usage = chunk.message.usage
 					yield {

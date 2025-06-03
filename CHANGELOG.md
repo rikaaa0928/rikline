@@ -1,5 +1,53 @@
 # Changelog
 
+## [3.17.9]
+
+-   Aligning Cline to work with Claude 4 model family (Experimental)
+-   Add task timeline scrolling feature
+-   Add support for uploading CSV and XLSX files for data analysis and processing
+-   Add stable Grok-3 models to xAI provider (grok-3, grok-3-fast, grok-3-mini, grok-3-mini-fast) and update default model from grok-3-beta to grok-3 (Thanks @PeterDaveHello!)
+-   Add new models to Vertex AI provider
+-   Add new model to Nebius AI Studio
+-   Remove hard-coded temperature from LM Studio API requests and add support for reasoning_content in LM Studio responses
+-   Display delay information when retrying API calls for better user feedback
+-   Fix AWS Bedrock credential caching issue where externally updated credentials (e.g., by AWS Identity Manager) were not detected, requiring extension restart (Thanks @DaveFres!)
+-   Fix search tool overloading conversation with massive outputs by setting maximum byte limit for responses
+-   Fix checkpoints functionality
+-   Fix token counting for xAI provider
+-   Fix Ollama provider issues
+-   Fix window title display for Windows users
+-   Improve chat box UI
+
+## [3.17.8]
+
+-   Fix bug where terminal would get stuck and output "capture failure"
+
+## [3.17.7]
+
+-   Fix diff editing reliability for Claude 4 family models by adding constraints to prevent errors with large replacements
+
+## [3.17.6]
+
+-   Add Cerebras as a new API provider with 5 high-performance models including reasoning-capable models (Thanks @kevint-cerebras!)
+-   Add support for uploading various file types (XML, JSON, TXT, LOG, MD, DOCX, IPYNB, PDF) alongside images
+-   Add improved onboarding experience for new users with guided setup
+-   Add prompt cache indicator for Gemini 2.5 Flash models
+-   Update SambaNova provider with new model list and documentation links (Thanks @luisfucros!)
+-   Fix diff editing support for Claude 4 family of models
+-   Improve telemetry and analytics for better user experience insights
+
+## [3.17.5]
+
+-   Fix issue with Claude 4 models where after several conversation turns, it would start making invalid diff edits
+
+## [3.17.4]
+
+-   Fix thinking budget slider for Claude 4
+
+## [3.17.3]
+
+-   Fix diff edit errors with Claude 4 models
+
 ## [3.17.2]
 
 -   Add support for Claude 4 models (Sonnet 4 and Opus 4) in AWS Bedrock and Vertex AI providers
