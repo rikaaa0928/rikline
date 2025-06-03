@@ -166,7 +166,7 @@ const extensionContext: vscode.ExtensionContext = {
 	extensionMode: 1, // Development
 
 	extension: {
-		id: "saoudrizwan.claude-dev",
+		id: "rikaaa0928.rikline",
 		isActive: true,
 		extensionPath: "/tmp/vscode/extension",
 		extensionUri: stubUri("/tmp/vscode/extension"),
