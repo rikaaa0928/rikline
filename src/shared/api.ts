@@ -602,6 +602,9 @@ export const vertexModels = {
 				cacheReadsPrice: 0.625,
 			},
 		],
+		thinkingConfig: {
+			maxBudget: 32768,
+		},
 	},
 	"gemini-2.5-flash-preview-04-17": {
 		maxTokens: 65536,
@@ -770,6 +773,9 @@ export const geminiModels = {
 				cacheReadsPrice: 0.625,
 			},
 		],
+		thinkingConfig: {
+			maxBudget: 32768,
+		},
 	},
 	"gemini-2.5-flash-preview-05-20": {
 		maxTokens: 65536,
@@ -921,9 +927,9 @@ export const openAiNativeModels = {
 		contextWindow: 200_000,
 		supportsImages: true,
 		supportsPromptCache: true,
-		inputPrice: 10.0,
-		outputPrice: 40.0,
-		cacheReadsPrice: 2.5,
+		inputPrice: 2.0,
+		outputPrice: 8.0,
+		cacheReadsPrice: 0.5,
 	},
 	"o4-mini": {
 		maxTokens: 100_000,

@@ -9,6 +9,7 @@ import {
 } from "@google/genai"
 // import NodeCache from "node-cache"
 import { withRetry } from "../retry"
+import { Part } from "@google/genai"
 import { ApiHandler } from "../"
 import { ApiHandlerOptions, geminiDefaultModelId, GeminiModelId, geminiModels, ModelInfo } from "@shared/api"
 import { convertAnthropicMessageToGemini } from "../transform/gemini-format"
@@ -113,9 +114,10 @@ export class GeminiHandler implements ApiHandler {
 		}
 
 		// Add thinking config if the model supports it
-		if (info.thinkingConfig?.outputPrice !== undefined && maxBudget > 0) {
+		if (thinkingBudget > 0) {
 			requestConfig.thinkingConfig = {
 				thinkingBudget: thinkingBudget,
+				includeThoughts: true,
 			}
 		}
 
@@ -128,6 +130,7 @@ export class GeminiHandler implements ApiHandler {
 		let promptTokens = 0
 		let outputTokens = 0
 		let cacheReadTokens = 0
+		let thoughtsTokenCount = 0 // Initialize thought token counts
 		let lastUsageMetadata: GenerateContentResponseUsageMetadata | undefined
 
 		try {
@@ -147,6 +150,31 @@ export class GeminiHandler implements ApiHandler {
 					isFirstSdkChunk = false
 				}
 
+				// Handle thinking content from Gemini's response
+				const candidateForThoughts = chunk?.candidates?.[0]
+				const partsForThoughts = candidateForThoughts?.content?.parts
+				let thoughts = "" // Initialize as empty string
+
+				if (partsForThoughts) {
+					// This ensures partsForThoughts is a Part[] array
+					for (const part of partsForThoughts) {
+						const { thought, text } = part as Part
+						if (thought && text) {
+							// Ensure part.text exists
+							// Handle the thought part
+							thoughts += text + "\n" // Append thought and a newline
+						}
+					}
+				}
+
+				if (thoughts.trim() !== "") {
+					yield {
+						type: "reasoning",
+						reasoning: thoughts.trim(),
+					}
+					thoughts = "" // Reset thoughts after yielding
+				}
+
 				if (chunk.text) {
 					yield {
 						type: "text",
@@ -158,6 +186,7 @@ export class GeminiHandler implements ApiHandler {
 					lastUsageMetadata = chunk.usageMetadata
 					promptTokens = lastUsageMetadata.promptTokenCount ?? promptTokens
 					outputTokens = lastUsageMetadata.candidatesTokenCount ?? outputTokens
+					thoughtsTokenCount = lastUsageMetadata.thoughtsTokenCount ?? thoughtsTokenCount
 					cacheReadTokens = lastUsageMetadata.cachedContentTokenCount ?? cacheReadTokens
 				}
 			}
@@ -168,12 +197,14 @@ export class GeminiHandler implements ApiHandler {
 					info,
 					inputTokens: promptTokens,
 					outputTokens,
+					thoughtsTokenCount,
 					cacheReadTokens,
 				})
 				yield {
 					type: "usage",
 					inputTokens: promptTokens,
 					outputTokens,
+					thoughtsTokenCount,
 					cacheReadTokens,
 					cacheWriteTokens: 0,
 					totalCost,
@@ -256,11 +287,13 @@ export class GeminiHandler implements ApiHandler {
 		info,
 		inputTokens,
 		outputTokens,
+		thoughtsTokenCount = 0,
 		cacheReadTokens = 0,
 	}: {
 		info: ModelInfo
 		inputTokens: number
 		outputTokens: number
+		thoughtsTokenCount: number
 		cacheReadTokens?: number
 	}) {
 		// Exit early if any required pricing information is missing
@@ -292,18 +325,18 @@ export class GeminiHandler implements ApiHandler {
 		const inputTokensCost = inputPrice * (uncachedInputTokens / 1_000_000)
 
 		// 2. Output token costs
-		const outputTokensCost = outputPrice * (outputTokens / 1_000_000)
+		const responseTokensCost = outputPrice * ((outputTokens + thoughtsTokenCount) / 1_000_000)
 
 		// 3. Cache read costs (immediate)
 		const cacheReadCost = (cacheReadTokens ?? 0) > 0 ? cacheReadsPrice * ((cacheReadTokens ?? 0) / 1_000_000) : 0
 
 		// Calculate total immediate cost (excluding cache write/storage costs)
-		const totalCost = inputTokensCost + outputTokensCost + cacheReadCost
+		const totalCost = inputTokensCost + responseTokensCost + cacheReadCost
 
 		// Create the trace object for debugging
 		const trace: Record<string, { price: number; tokens: number; cost: number }> = {
 			input: { price: inputPrice, tokens: uncachedInputTokens, cost: inputTokensCost },
-			output: { price: outputPrice, tokens: outputTokens, cost: outputTokensCost },
+			output: { price: outputPrice, tokens: outputTokens, cost: responseTokensCost },
 		}
 
 		// Only include cache read costs in the trace (cache write costs are tracked separately)

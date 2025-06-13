@@ -1,8 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useEvent } from "react-use"
-import { EmptyRequest } from "@shared/proto/common"
+import {
+	StateServiceClient,
+	ModelsServiceClient,
+	UiServiceClient,
+	FileServiceClient,
+	McpServiceClient,
+} from "../services/grpc-client"
+import { EmptyRequest, StringRequest } from "@shared/proto/common"
+import { UpdateSettingsRequest } from "@shared/proto/state"
 import { WebviewProviderType as WebviewProviderTypeEnum, WebviewProviderTypeRequest } from "@shared/proto/ui"
 import { convertProtoToClineMessage } from "@shared/proto-conversions/cline-message"
+import { convertProtoMcpServersToMcpServers } from "@shared/proto-conversions/mcp/mcp-server-conversion"
 import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "@shared/AutoApprovalSettings"
 import { DEFAULT_BROWSER_SETTINGS } from "@shared/BrowserSettings"
 import { ChatSettings, DEFAULT_CHAT_SETTINGS } from "@shared/ChatSettings"
@@ -18,9 +27,7 @@ import {
 	requestyDefaultModelInfo,
 } from "../../../src/shared/api"
 import { McpMarketplaceCatalog, McpServer, McpViewTab } from "../../../src/shared/mcp"
-import { ModelsServiceClient, StateServiceClient, UiServiceClient, McpServiceClient } from "../services/grpc-client"
 import { convertTextMateToHljs } from "../utils/textMateToHljs"
-import { vscode } from "../utils/vscode"
 import { OpenRouterCompatibleModelInfo } from "@shared/proto/models"
 
 interface ExtensionStateContextType extends ExtensionState {
@@ -45,7 +52,6 @@ interface ExtensionStateContextType extends ExtensionState {
 
 	// Setters
 	setApiConfiguration: (config: ApiConfiguration) => void
-	setCustomInstructions: (value?: string) => void
 	setTelemetrySetting: (value: TelemetrySetting) => void
 	setShowAnnouncement: (value: boolean) => void
 	setShouldShowAnnouncement: (value: boolean) => void
@@ -86,6 +92,9 @@ interface ExtensionStateContextType extends ExtensionState {
 	hideAccount: () => void
 	hideAnnouncement: () => void
 	closeMcpView: () => void
+
+	// Event callbacks
+	onRelinquishControl: (callback: () => void) => () => void
 }
 
 const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
@@ -200,10 +209,6 @@ export const ExtensionStateContextProvider: React.FC<{
 	const handleMessage = useCallback((event: MessageEvent) => {
 		const message: ExtensionMessage = event.data
 		switch (message.type) {
-			case "workspaceUpdated": {
-				setFilePaths(message.filePaths ?? [])
-				break
-			}
 			case "openAiModels": {
 				const updatedModels = message.openAiModels ?? []
 				setOpenAiModels(updatedModels)
@@ -217,10 +222,6 @@ export const ExtensionStateContextProvider: React.FC<{
 				})
 				break
 			}
-			case "mcpServers": {
-				setMcpServers(message.mcpServers ?? [])
-				break
-			}
 		}
 	}, [])
 
@@ -228,6 +229,9 @@ export const ExtensionStateContextProvider: React.FC<{
 
 	// References to store subscription cancellation functions
 	const stateSubscriptionRef = useRef<(() => void) | null>(null)
+
+	// Reference for focusChatInput subscription
+	const focusChatInputUnsubscribeRef = useRef<(() => void) | null>(null)
 	const mcpButtonUnsubscribeRef = useRef<(() => void) | null>(null)
 	const historyButtonClickedSubscriptionRef = useRef<(() => void) | null>(null)
 	const chatButtonUnsubscribeRef = useRef<(() => void) | null>(null)
@@ -237,6 +241,20 @@ export const ExtensionStateContextProvider: React.FC<{
 	const mcpMarketplaceUnsubscribeRef = useRef<(() => void) | null>(null)
 	const themeSubscriptionRef = useRef<(() => void) | null>(null)
 	const openRouterModelsUnsubscribeRef = useRef<(() => void) | null>(null)
+	const workspaceUpdatesUnsubscribeRef = useRef<(() => void) | null>(null)
+	const relinquishControlUnsubscribeRef = useRef<(() => void) | null>(null)
+
+	// Add ref for callbacks
+	const relinquishControlCallbacks = useRef<Set<() => void>>(new Set())
+
+	// Create hook function
+	const onRelinquishControl = useCallback((callback: () => void) => {
+		relinquishControlCallbacks.current.add(callback)
+		return () => {
+			relinquishControlCallbacks.current.delete(callback)
+		}
+	}, [])
+	const mcpServersSubscriptionRef = useRef<(() => void) | null>(null)
 
 	// Subscribe to state updates and UI events using the gRPC streaming API
 	useEffect(() => {
@@ -366,6 +384,34 @@ export const ExtensionStateContextProvider: React.FC<{
 			onComplete: () => {},
 		})
 
+		// Subscribe to MCP servers updates
+		mcpServersSubscriptionRef.current = McpServiceClient.subscribeToMcpServers(EmptyRequest.create(), {
+			onResponse: (response) => {
+				console.log("[DEBUG] Received MCP servers update from gRPC stream")
+				if (response.mcpServers) {
+					setMcpServers(convertProtoMcpServersToMcpServers(response.mcpServers))
+				}
+			},
+			onError: (error) => {
+				console.error("Error in MCP servers subscription:", error)
+			},
+			onComplete: () => {
+				console.log("MCP servers subscription completed")
+			},
+		})
+
+		// Subscribe to workspace file updates
+		workspaceUpdatesUnsubscribeRef.current = FileServiceClient.subscribeToWorkspaceUpdates(EmptyRequest.create({}), {
+			onResponse: (response) => {
+				console.log("[DEBUG] Received workspace update event from gRPC stream")
+				setFilePaths(response.values || [])
+			},
+			onError: (error) => {
+				console.error("Error in workspace updates subscription:", error)
+			},
+			onComplete: () => {},
+		})
+
 		// Set up settings button clicked subscription
 		settingsButtonClickedSubscriptionRef.current = UiServiceClient.subscribeToSettingsButtonClicked(
 			WebviewProviderTypeRequest.create({
@@ -389,8 +435,6 @@ export const ExtensionStateContextProvider: React.FC<{
 		partialMessageUnsubscribeRef.current = UiServiceClient.subscribeToPartialMessage(EmptyRequest.create({}), {
 			onResponse: (protoMessage) => {
 				try {
-					console.log("[PARTIAL] Received partialMessage event from gRPC stream")
-
 					// Validate critical fields
 					if (!protoMessage.ts || protoMessage.ts <= 0) {
 						console.error("Invalid timestamp in partial message:", protoMessage)
@@ -398,8 +442,6 @@ export const ExtensionStateContextProvider: React.FC<{
 					}
 
 					const partialMessage = convertProtoToClineMessage(protoMessage)
-					console.log("[PARTIAL] Partial message:", partialMessage)
-					console.log("\n")
 					setState((prevState) => {
 						// worth noting it will never be possible for a more up-to-date message to be sent here or in normal messages post since the presentAssistantContent function uses lock
 						const lastIndex = findLastIndex(prevState.clineMessages, (msg) => msg.ts === partialMessage.ts)
@@ -499,6 +541,36 @@ export const ExtensionStateContextProvider: React.FC<{
 			},
 		})
 
+		// Subscribe to relinquish control events
+		relinquishControlUnsubscribeRef.current = UiServiceClient.subscribeToRelinquishControl(EmptyRequest.create({}), {
+			onResponse: () => {
+				// Call all registered callbacks
+				relinquishControlCallbacks.current.forEach((callback) => callback())
+			},
+			onError: (error) => {
+				console.error("Error in relinquishControl subscription:", error)
+			},
+			onComplete: () => {},
+		})
+
+		// Subscribe to focus chat input events
+		const clientId = (window as any).clineClientId
+		if (clientId) {
+			const request = StringRequest.create({ value: clientId })
+			focusChatInputUnsubscribeRef.current = UiServiceClient.subscribeToFocusChatInput(request, {
+				onResponse: () => {
+					// Dispatch a local DOM event within this webview only
+					window.dispatchEvent(new CustomEvent("focusChatInput"))
+				},
+				onError: (error: Error) => {
+					console.error("Error in focusChatInput subscription:", error)
+				},
+				onComplete: () => {},
+			})
+		} else {
+			console.error("Client ID not found in window object")
+		}
+
 		// Clean up subscriptions when component unmounts
 		return () => {
 			if (stateSubscriptionRef.current) {
@@ -540,6 +612,22 @@ export const ExtensionStateContextProvider: React.FC<{
 			if (openRouterModelsUnsubscribeRef.current) {
 				openRouterModelsUnsubscribeRef.current()
 				openRouterModelsUnsubscribeRef.current = null
+			}
+			if (workspaceUpdatesUnsubscribeRef.current) {
+				workspaceUpdatesUnsubscribeRef.current()
+				workspaceUpdatesUnsubscribeRef.current = null
+			}
+			if (relinquishControlUnsubscribeRef.current) {
+				relinquishControlUnsubscribeRef.current()
+				relinquishControlUnsubscribeRef.current = null
+			}
+			if (focusChatInputUnsubscribeRef.current) {
+				focusChatInputUnsubscribeRef.current()
+				focusChatInputUnsubscribeRef.current = null
+			}
+			if (mcpServersSubscriptionRef.current) {
+				mcpServersSubscriptionRef.current()
+				mcpServersSubscriptionRef.current = null
 			}
 		}
 	}, [])
@@ -599,11 +687,6 @@ export const ExtensionStateContextProvider: React.FC<{
 				...prevState,
 				apiConfiguration: value,
 			})),
-		setCustomInstructions: (value) =>
-			setState((prevState) => ({
-				...prevState,
-				customInstructions: value,
-			})),
 		setTelemetrySetting: (value) =>
 			setState((prevState) => ({
 				...prevState,
@@ -650,22 +733,37 @@ export const ExtensionStateContextProvider: React.FC<{
 		setMcpMarketplaceCatalog: (catalog: McpMarketplaceCatalog) => setMcpMarketplaceCatalog(catalog),
 		setShowMcp,
 		closeMcpView,
-		setChatSettings: (value) => {
+		setChatSettings: async (value) => {
 			setState((prevState) => ({
 				...prevState,
 				chatSettings: value,
 			}))
-			vscode.postMessage({
-				type: "updateSettings",
-				chatSettings: value,
-				apiConfiguration: state.apiConfiguration,
-				customInstructionsSetting: state.customInstructions,
-				telemetrySetting: state.telemetrySetting,
-				planActSeparateModelsSetting: state.planActSeparateModelsSetting,
-				enableCheckpointsSetting: state.enableCheckpointsSetting,
-				mcpMarketplaceEnabled: state.mcpMarketplaceEnabled,
-				mcpResponsesCollapsed: state.mcpResponsesCollapsed,
-			})
+
+			try {
+				// Import the conversion functions
+				const { convertApiConfigurationToProtoApiConfiguration } = await import(
+					"@shared/proto-conversions/state/settings-conversion"
+				)
+				const { convertChatSettingsToProtoChatSettings } = await import(
+					"@shared/proto-conversions/state/chat-settings-conversion"
+				)
+
+				await StateServiceClient.updateSettings(
+					UpdateSettingsRequest.create({
+						chatSettings: convertChatSettingsToProtoChatSettings(value),
+						apiConfiguration: state.apiConfiguration
+							? convertApiConfigurationToProtoApiConfiguration(state.apiConfiguration)
+							: undefined,
+						telemetrySetting: state.telemetrySetting,
+						planActSeparateModelsSetting: state.planActSeparateModelsSetting,
+						enableCheckpointsSetting: state.enableCheckpointsSetting,
+						mcpMarketplaceEnabled: state.mcpMarketplaceEnabled,
+						mcpResponsesCollapsed: state.mcpResponsesCollapsed,
+					}),
+				)
+			} catch (error) {
+				console.error("Failed to update chat settings:", error)
+			}
 		},
 		setGlobalClineRulesToggles: (toggles) =>
 			setState((prevState) => ({
@@ -700,6 +798,7 @@ export const ExtensionStateContextProvider: React.FC<{
 		setMcpTab,
 		setTotalTasksSize,
 		refreshOpenRouterModels,
+		onRelinquishControl,
 	}
 
 	return <ExtensionStateContext.Provider value={contextValue}>{children}</ExtensionStateContext.Provider>
