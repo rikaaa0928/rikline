@@ -230,4 +230,8 @@ message ModelsApiConfiguration {
   // From ApiConfiguration (additional fields)
   optional ApiProvider api_provider = 66;
   repeated string favorited_model_ids = 67;
+
+   // rikline add on
+  optional string vertex_base_url = 68;
+	optional string vertex_credentials_path = 69;
 }

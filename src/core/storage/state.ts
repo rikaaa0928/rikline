@@ -308,6 +308,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getGlobalState(context, "mcpResponsesCollapsed") as Promise<boolean | undefined>,
 		getGlobalState(context, "globalWorkflowToggles") as Promise<ClineRulesToggles | undefined>,
 		getGlobalState(context, "terminalReuseEnabled") as Promise<boolean | undefined>,
+		getGlobalState(context, "httpProxy") as Promise<string | undefined>,
 	])
 
 	const localClineRulesToggles = (await getWorkspaceState(context, "localClineRulesToggles")) as ClineRulesToggles
@@ -509,6 +510,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		shellIntegrationTimeout: shellIntegrationTimeout || 4000,
 		terminalReuseEnabled: terminalReuseEnabled ?? true,
 		globalWorkflowToggles: globalWorkflowToggles || {},
+		httpProxy: (await getGlobalState(context, "httpProxy")) as string | undefined,
 	}
 }
 

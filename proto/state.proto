@@ -77,6 +77,7 @@ message UpdateSettingsRequest {
   optional int64 shell_integration_timeout = 8;
   optional bool terminal_reuse_enabled = 9;
   optional bool mcp_responses_collapsed = 10;
+  optional string http_proxy = 11;
 }
 
 // Complete API Configuration message
@@ -185,4 +186,8 @@ message ApiConfiguration {
   
   // Favorited model IDs
   repeated string favorited_model_ids = 71;
+
+  // rikline add on
+  optional string vertex_base_url = 72;
+	optional string vertex_credentials_path = 73;
 }

@@ -61,6 +61,22 @@ export class Controller {
 	accountService: ClineAccountService
 	latestAnnouncementId = "may-22-2025_16:11:00" // update to some unique identifier when we add a new announcement
 
+	private async applyHttpProxy(proxyUrl?: string) {
+		if (proxyUrl && proxyUrl.trim() !== "") {
+			process.env.HTTP_PROXY = proxyUrl
+			process.env.HTTPS_PROXY = proxyUrl
+			process.env.http_proxy = proxyUrl
+			process.env.https_proxy = proxyUrl
+			this.outputChannel.appendLine(`Applied HTTP Proxy: ${proxyUrl}`)
+		} else {
+			delete process.env.HTTP_PROXY
+			delete process.env.HTTPS_PROXY
+			delete process.env.http_proxy
+			delete process.env.https_proxy
+			this.outputChannel.appendLine("Cleared HTTP Proxy settings.")
+		}
+	}
+
 	constructor(
 		readonly context: vscode.ExtensionContext,
 		private readonly outputChannel: vscode.OutputChannel,
@@ -88,6 +104,17 @@ export class Controller {
 		cleanupLegacyCheckpoints(this.context.globalStorageUri.fsPath, this.outputChannel).catch((error) => {
 			console.error("Failed to cleanup legacy checkpoints:", error)
 		})
+
+		// Apply HTTP proxy setting on startup
+		getGlobalState(this.context, "httpProxy")
+			.then((proxy) => {
+				if (typeof proxy === "string") {
+					this.applyHttpProxy(proxy)
+				}
+			})
+			.catch((error) => {
+				console.error("Failed to apply HTTP proxy on startup:", error)
+			})
 	}
 
 	/*
@@ -954,6 +981,7 @@ export class Controller {
 			terminalReuseEnabled,
 			isNewUser,
 			mcpResponsesCollapsed,
+			httpProxy, // Added for HTTP Proxy
 		} = await getAllExtensionState(this.context)
 
 		const localClineRulesToggles =
@@ -999,6 +1027,7 @@ export class Controller {
 			terminalReuseEnabled,
 			isNewUser,
 			mcpResponsesCollapsed,
+			httpProxy: (await getGlobalState(this.context, "httpProxy")) as string | undefined,
 		}
 	}
 
@@ -1178,4 +1207,14 @@ Commit message:`
 	}
 
 	// dev
+
+	// NOTE TO DEVELOPER:
+	// The gRPC handler for `StateService.updateSettings` needs to be updated
+	// to handle the `httpProxy` field from `UpdateSettingsRequest`.
+	// When `httpProxy` is received, it should:
+	// 1. Save the setting:
+	//    `await updateGlobalState(this.context, "httpProxy", request.httpProxy)`
+	// 2. Apply the setting using the new helper method:
+	//    `await this.applyHttpProxy(request.httpProxy)`
+	// 3. Ensure `postStateToWebview()` is called to update the UI.
 }

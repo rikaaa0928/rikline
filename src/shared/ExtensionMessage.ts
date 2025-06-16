@@ -105,6 +105,7 @@ export interface ExtensionState {
 	localCursorRulesToggles: ClineRulesToggles
 	localWindsurfRulesToggles: ClineRulesToggles
 	mcpResponsesCollapsed?: boolean
+	httpProxy?: string
 }
 
 export interface ClineMessage {

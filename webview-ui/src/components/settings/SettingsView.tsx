@@ -18,6 +18,7 @@ import ApiOptions from "./ApiOptions"
 import BrowserSettingsSection from "./BrowserSettingsSection"
 import FeatureSettingsSection from "./FeatureSettingsSection"
 import PreferredLanguageSetting from "./PreferredLanguageSetting" // Added import
+import ProxySetting from "./ProxySetting" // Added import
 import Section from "./Section"
 import SectionHeader from "./SectionHeader"
 import TerminalSettingsSection from "./TerminalSettingsSection"
@@ -133,6 +134,8 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		mcpResponsesCollapsed,
 		setMcpResponsesCollapsed,
 		setApiConfiguration,
+		httpProxy, // Added for HTTP Proxy
+		setHttpProxy, // Added for HTTP Proxy
 	} = useExtensionState()
 
 	// Store the original state to detect changes
@@ -146,6 +149,7 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		chatSettings,
 		shellIntegrationTimeout,
 		terminalReuseEnabled,
+		httpProxy, // Added for HTTP Proxy
 	})
 	const [apiErrorMessage, setApiErrorMessage] = useState<string | undefined>(undefined)
 	const [modelIdErrorMessage, setModelIdErrorMessage] = useState<string | undefined>(undefined)
@@ -183,6 +187,7 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 					shellIntegrationTimeout,
 					terminalReuseEnabled,
 					mcpResponsesCollapsed,
+					httpProxy: httpProxy, // Added for HTTP Proxy
 					apiConfiguration: apiConfigurationToSubmit
 						? convertApiConfigurationToProtoApiConfiguration(apiConfigurationToSubmit)
 						: undefined,
@@ -214,7 +219,8 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 			mcpResponsesCollapsed !== originalState.current.mcpResponsesCollapsed ||
 			JSON.stringify(chatSettings) !== JSON.stringify(originalState.current.chatSettings) ||
 			shellIntegrationTimeout !== originalState.current.shellIntegrationTimeout ||
-			terminalReuseEnabled !== originalState.current.terminalReuseEnabled
+			terminalReuseEnabled !== originalState.current.terminalReuseEnabled ||
+			httpProxy !== originalState.current.httpProxy // Added for HTTP Proxy
 
 		setHasUnsavedChanges(hasChanges)
 	}, [
@@ -227,6 +233,7 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		chatSettings,
 		shellIntegrationTimeout,
 		terminalReuseEnabled,
+		httpProxy, // Added for HTTP Proxy
 	])
 
 	// Handle cancel button click
@@ -266,6 +273,10 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 				if (typeof setMcpResponsesCollapsed === "function") {
 					setMcpResponsesCollapsed(originalState.current.mcpResponsesCollapsed ?? false)
 				}
+				if (typeof setHttpProxy === "function") {
+					// Added for HTTP Proxy
+					setHttpProxy(originalState.current.httpProxy ?? undefined)
+				}
 				// Close settings view
 				onDone()
 			}
@@ -283,6 +294,7 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		setEnableCheckpointsSetting,
 		setMcpMarketplaceEnabled,
 		setMcpResponsesCollapsed,
+		setHttpProxy, // Added for HTTP Proxy
 	])
 
 	// Handle confirmation dialog actions
@@ -587,6 +599,9 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 												chatSettings={chatSettings}
 												setChatSettings={setChatSettings}
 											/>
+										)}
+										{typeof setHttpProxy === "function" && (
+											<ProxySetting httpProxy={httpProxy} setHttpProxy={setHttpProxy} />
 										)}
 
 										<div className="mb-[5px]">

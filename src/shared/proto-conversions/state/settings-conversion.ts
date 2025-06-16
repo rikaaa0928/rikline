@@ -66,6 +66,8 @@ export function convertApiConfigurationToProtoApiConfiguration(config: ApiConfig
 		// Vertex AI fields
 		vertexProjectId: config.vertexProjectId,
 		vertexRegion: config.vertexRegion,
+		vertexBaseUrl: config.vertexBaseUrl,
+		vertexCredentialsPath: config.vertexCredentialsPath,
 
 		// Base URLs and endpoints
 		openaiBaseUrl: config.openAiBaseUrl,
@@ -172,6 +174,8 @@ export function convertProtoApiConfigurationToApiConfiguration(protoConfig: Prot
 		// Vertex AI fields
 		vertexProjectId: protoConfig.vertexProjectId,
 		vertexRegion: protoConfig.vertexRegion,
+		vertexBaseUrl: protoConfig.vertexBaseUrl,
+		vertexCredentialsPath: protoConfig.vertexCredentialsPath,
 
 		// Base URLs and endpoints
 		openAiBaseUrl: protoConfig.openaiBaseUrl,

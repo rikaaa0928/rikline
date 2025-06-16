@@ -72,6 +72,7 @@ export type GlobalStateKey =
 	| "mcpResponsesCollapsed"
 	| "terminalReuseEnabled"
 	| "isNewUser"
+	| "httpProxy"
 
 export type LocalStateKey =
 	| "localClineRulesToggles"
