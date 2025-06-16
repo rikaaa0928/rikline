@@ -10,6 +10,7 @@ import {
 import { EmptyRequest, StringRequest } from "@shared/proto/common"
 import { UpdateSettingsRequest } from "@shared/proto/state"
 import { WebviewProviderType as WebviewProviderTypeEnum, WebviewProviderTypeRequest } from "@shared/proto/ui"
+import { TerminalProfile } from "@shared/proto/state"
 import { convertProtoToClineMessage } from "@shared/proto-conversions/cline-message"
 import { convertProtoMcpServersToMcpServers } from "@shared/proto-conversions/mcp/mcp-server-conversion"
 import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "@shared/AutoApprovalSettings"
@@ -41,6 +42,7 @@ interface ExtensionStateContextType extends ExtensionState {
 	mcpMarketplaceCatalog: McpMarketplaceCatalog
 	filePaths: string[]
 	totalTasksSize: number | null
+	availableTerminalProfiles: TerminalProfile[]
 	httpProxy?: string // Added for HTTP Proxy setting
 
 	// View state
@@ -59,9 +61,12 @@ interface ExtensionStateContextType extends ExtensionState {
 	setPlanActSeparateModelsSetting: (value: boolean) => void
 	setEnableCheckpointsSetting: (value: boolean) => void
 	setMcpMarketplaceEnabled: (value: boolean) => void
+	setMcpRichDisplayEnabled: (value: boolean) => void
 	setMcpResponsesCollapsed: (value: boolean) => void
 	setShellIntegrationTimeout: (value: number) => void
 	setTerminalReuseEnabled: (value: boolean) => void
+	setTerminalOutputLineLimit: (value: number) => void
+	setDefaultTerminalProfile: (value: string) => void
 	setChatSettings: (value: ChatSettings) => void
 	setMcpServers: (value: McpServer[]) => void
 	setGlobalClineRulesToggles: (toggles: Record<string, boolean>) => void
@@ -72,6 +77,7 @@ interface ExtensionStateContextType extends ExtensionState {
 	setGlobalWorkflowToggles: (toggles: Record<string, boolean>) => void
 	setMcpMarketplaceCatalog: (value: McpMarketplaceCatalog) => void
 	setTotalTasksSize: (value: number | null) => void
+	setAvailableTerminalProfiles: (profiles: TerminalProfile[]) => void // Setter for profiles
 	setHttpProxy: (value: string | undefined) => void // Added for HTTP Proxy setting
 
 	// Refresh functions
@@ -182,14 +188,17 @@ export const ExtensionStateContextProvider: React.FC<{
 		distinctId: "",
 		planActSeparateModelsSetting: true,
 		enableCheckpointsSetting: true,
+		mcpRichDisplayEnabled: true,
 		globalClineRulesToggles: {},
 		localClineRulesToggles: {},
 		localCursorRulesToggles: {},
 		localWindsurfRulesToggles: {},
 		localWorkflowToggles: {},
 		globalWorkflowToggles: {},
-		shellIntegrationTimeout: 4000, // default timeout for shell integration
-		terminalReuseEnabled: true, // default to enabled for backward compatibility
+		shellIntegrationTimeout: 4000,
+		terminalReuseEnabled: true,
+		terminalOutputLineLimit: 500,
+		defaultTerminalProfile: "default",
 		isNewUser: false,
 		mcpResponsesCollapsed: false, // Default value (expanded), will be overwritten by extension state
 		httpProxy: undefined, // Added for HTTP Proxy setting
@@ -202,6 +211,7 @@ export const ExtensionStateContextProvider: React.FC<{
 		[openRouterDefaultModelId]: openRouterDefaultModelInfo,
 	})
 	const [totalTasksSize, setTotalTasksSize] = useState<number | null>(null)
+	const [availableTerminalProfiles, setAvailableTerminalProfiles] = useState<TerminalProfile[]>([])
 
 	const [openAiModels, setOpenAiModels] = useState<string[]>([])
 	const [requestyModels, setRequestyModels] = useState<Record<string, ModelInfo>>({
@@ -310,6 +320,7 @@ export const ExtensionStateContextProvider: React.FC<{
 										config.asksageApiKey,
 										config.xaiApiKey,
 										config.sambanovaApiKey,
+										config.sapAiCoreClientId,
 									].some((key) => key !== undefined)
 								: false
 
@@ -544,6 +555,15 @@ export const ExtensionStateContextProvider: React.FC<{
 			},
 		})
 
+		// Fetch available terminal profiles on launch
+		StateServiceClient.getAvailableTerminalProfiles(EmptyRequest.create({}))
+			.then((response) => {
+				setAvailableTerminalProfiles(response.profiles)
+			})
+			.catch((error) => {
+				console.error("Failed to fetch available terminal profiles:", error)
+			})
+
 		// Subscribe to relinquish control events
 		relinquishControlUnsubscribeRef.current = UiServiceClient.subscribeToRelinquishControl(EmptyRequest.create({}), {
 			onResponse: () => {
@@ -659,6 +679,7 @@ export const ExtensionStateContextProvider: React.FC<{
 		mcpMarketplaceCatalog,
 		filePaths,
 		totalTasksSize,
+		availableTerminalProfiles,
 		showMcp,
 		mcpTab,
 		showSettings,
@@ -710,6 +731,11 @@ export const ExtensionStateContextProvider: React.FC<{
 				...prevState,
 				mcpMarketplaceEnabled: value,
 			})),
+		setMcpRichDisplayEnabled: (value) =>
+			setState((prevState) => ({
+				...prevState,
+				mcpRichDisplayEnabled: value,
+			})),
 		setMcpResponsesCollapsed: (value) => {
 			setState((prevState) => ({
 				...prevState,
@@ -732,8 +758,19 @@ export const ExtensionStateContextProvider: React.FC<{
 				...prevState,
 				terminalReuseEnabled: value,
 			})),
+		setTerminalOutputLineLimit: (value) =>
+			setState((prevState) => ({
+				...prevState,
+				terminalOutputLineLimit: value,
+			})),
+		setDefaultTerminalProfile: (value) =>
+			setState((prevState) => ({
+				...prevState,
+				defaultTerminalProfile: value,
+			})),
 		setMcpServers: (mcpServers: McpServer[]) => setMcpServers(mcpServers),
 		setMcpMarketplaceCatalog: (catalog: McpMarketplaceCatalog) => setMcpMarketplaceCatalog(catalog),
+		setAvailableTerminalProfiles,
 		setShowMcp,
 		closeMcpView,
 		setChatSettings: async (value) => {
@@ -741,7 +778,6 @@ export const ExtensionStateContextProvider: React.FC<{
 				...prevState,
 				chatSettings: value,
 			}))
-
 			try {
 				// Import the conversion functions
 				const { convertApiConfigurationToProtoApiConfiguration } = await import(
@@ -761,6 +797,7 @@ export const ExtensionStateContextProvider: React.FC<{
 						planActSeparateModelsSetting: state.planActSeparateModelsSetting,
 						enableCheckpointsSetting: state.enableCheckpointsSetting,
 						mcpMarketplaceEnabled: state.mcpMarketplaceEnabled,
+						mcpRichDisplayEnabled: state.mcpRichDisplayEnabled,
 						mcpResponsesCollapsed: state.mcpResponsesCollapsed,
 					}),
 				)

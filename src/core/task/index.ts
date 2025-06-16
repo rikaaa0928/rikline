@@ -113,7 +113,7 @@ import { isInTestMode } from "../../services/test/TestMode"
 import { processFilesIntoText } from "@integrations/misc/extract-text"
 import { featureFlagsService } from "@services/posthog/feature-flags/FeatureFlagsService"
 import { StreamingJsonReplacer, ChangeLocation } from "@core/assistant-message/diff-json"
-import { isClaude4ModelFamily } from "@/utils/model-utils"
+import { isClaude4ModelFamily } from "@utils/model-utils"
 import { saveClineMessagesAndUpdateHistory } from "./message-state"
 
 export const USE_EXPERIMENTAL_CLAUDE4_FEATURES = false
@@ -141,7 +141,7 @@ export class Task {
 	readonly taskId: string
 	private taskIsFavorited?: boolean
 	api: ApiHandler
-	private terminalManager: TerminalManager
+	terminalManager: TerminalManager
 	private urlContentFetcher: UrlContentFetcher
 	browserSession: BrowserSession
 	contextManager: ContextManager
@@ -204,6 +204,8 @@ export class Task {
 		chatSettings: ChatSettings,
 		shellIntegrationTimeout: number,
 		terminalReuseEnabled: boolean,
+		terminalOutputLineLimit: number,
+		defaultTerminalProfile: string,
 		enableCheckpointsSetting: boolean,
 		task?: string,
 		images?: string[],
@@ -223,6 +225,8 @@ export class Task {
 		this.terminalManager = new TerminalManager()
 		this.terminalManager.setShellIntegrationTimeout(shellIntegrationTimeout)
 		this.terminalManager.setTerminalReuseEnabled(terminalReuseEnabled ?? true)
+		this.terminalManager.setTerminalOutputLineLimit(terminalOutputLineLimit)
+		this.terminalManager.setDefaultTerminalProfile(defaultTerminalProfile)
 		this.urlContentFetcher = new UrlContentFetcher(context)
 		this.browserSession = new BrowserSession(context, browserSettings)
 		this.contextManager = new ContextManager()
@@ -1475,9 +1479,9 @@ export class Task {
 			chunkTimer = setTimeout(async () => await flushBuffer(), CHUNK_DEBOUNCE_MS)
 		}
 
-		let result = ""
+		const outputLines: string[] = []
 		process.on("line", async (line) => {
-			result += line + "\n"
+			outputLines.push(line)
 
 			if (!didContinue) {
 				outputBuffer.push(line)
@@ -1519,7 +1523,7 @@ export class Task {
 		// grouping command_output messages despite any gaps anyways)
 		await setTimeoutPromise(50)
 
-		result = result.trim()
+		let result = this.terminalManager.processOutput(outputLines)
 
 		if (userFeedback) {
 			await this.say("user_feedback", userFeedback.text, userFeedback.images, userFeedback.files)
