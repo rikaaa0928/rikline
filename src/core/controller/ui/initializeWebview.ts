@@ -60,7 +60,8 @@ export async function initializeWebview(controller: Controller, request: EmptyRe
 		// Initialize telemetry service with user's current setting
 		controller.getStateToPostToWebview().then((state) => {
 			const { telemetrySetting } = state
-			const isOptedIn = telemetrySetting !== "disabled"
+			// const isOptedIn = telemetrySetting !== "disabled"
+			const isOptedIn = false // 禁用 telemetry
 			telemetryService.updateTelemetryState(isOptedIn)
 		})
 
