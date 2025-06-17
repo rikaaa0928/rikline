@@ -234,6 +234,8 @@ function convertApiProviderToProto(provider: string | undefined): ProtoApiProvid
 			return ProtoApiProvider.SAMBANOVA
 		case "cerebras":
 			return ProtoApiProvider.CEREBRAS
+		case "mify":
+			return ProtoApiProvider.MIFY
 		default:
 			return ProtoApiProvider.ANTHROPIC
 	}
@@ -290,6 +292,8 @@ function convertProtoToApiProvider(provider: ProtoApiProvider): ApiProvider {
 			return "sambanova"
 		case ProtoApiProvider.CEREBRAS:
 			return "cerebras"
+		case ProtoApiProvider.MIFY:
+			return "mify"
 		default:
 			return "anthropic"
 	}
@@ -367,6 +371,10 @@ export function convertApiConfigurationToProto(config: ApiConfiguration): ProtoA
 		requestTimeoutMs: config.requestTimeoutMs,
 		apiProvider: config.apiProvider ? convertApiProviderToProto(config.apiProvider) : undefined,
 		favoritedModelIds: config.favoritedModelIds || [],
+		mifyApiKey: config.mifyApiKey,
+		mifyBaseUrl: config.mifyBaseUrl,
+		mifyModelId: config.mifyModelId,
+		mifyModelInfo: convertOpenAiCompatibleModelInfoToProto(config.mifyModelInfo),
 	}
 }
 
@@ -442,5 +450,9 @@ export function convertProtoToApiConfiguration(protoConfig: ProtoApiConfiguratio
 		requestTimeoutMs: protoConfig.requestTimeoutMs,
 		apiProvider: protoConfig.apiProvider !== undefined ? convertProtoToApiProvider(protoConfig.apiProvider) : undefined,
 		favoritedModelIds: protoConfig.favoritedModelIds.length > 0 ? protoConfig.favoritedModelIds : undefined,
+		mifyApiKey: protoConfig.mifyApiKey,
+		mifyBaseUrl: protoConfig.mifyBaseUrl,
+		mifyModelId: protoConfig.mifyModelId,
+		mifyModelInfo: convertProtoToOpenAiCompatibleModelInfo(protoConfig.mifyModelInfo),
 	}
 }

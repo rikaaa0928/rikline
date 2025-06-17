@@ -121,6 +121,7 @@ enum ApiProvider {
   XAI = 21;
   SAMBANOVA = 22;
   CEREBRAS = 23;
+  MIFY = 24;
 }
 
 // Model info for OpenAI-compatible models
@@ -234,4 +235,10 @@ message ModelsApiConfiguration {
    // rikline add on
   optional string vertex_base_url = 68;
 	optional string vertex_credentials_path = 69;
+	
+	// Mify provider fields
+	optional string mify_api_key = 70;
+	optional string mify_base_url = 71;
+	optional string mify_model_id = 72;
+	optional OpenAiCompatibleModelInfo mify_model_info = 73;
 }
