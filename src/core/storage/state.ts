@@ -334,6 +334,8 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		requestyModelInfo,
 		togetherModelId,
 		fireworksModelId,
+		mifyModelId,
+		mifyModelInfo,
 		previousModeApiProvider,
 		previousModeModelId,
 		previousModeModelInfo,
@@ -363,6 +365,8 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getWorkspaceState(context, "requestyModelInfo") as Promise<ModelInfo | undefined>,
 		getWorkspaceState(context, "togetherModelId") as Promise<string | undefined>,
 		getWorkspaceState(context, "fireworksModelId") as Promise<string | undefined>,
+		getWorkspaceState(context, "mifyModelId") as Promise<string | undefined>,
+		getWorkspaceState(context, "mifyModelInfo") as Promise<ModelInfo | undefined>,
 		getWorkspaceState(context, "previousModeApiProvider") as Promise<ApiProvider | undefined>,
 		getWorkspaceState(context, "previousModeModelId") as Promise<string | undefined>,
 		getWorkspaceState(context, "previousModeModelInfo") as Promise<ModelInfo | undefined>,
@@ -481,6 +485,10 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 			nebiusApiKey,
 			favoritedModelIds,
 			requestTimeoutMs,
+			mifyApiKey: (await getSecret(context, "mifyApiKey")) as string | undefined,
+			mifyBaseUrl: (await getGlobalState(context, "mifyBaseUrl")) as string | undefined,
+			mifyModelId,
+			mifyModelInfo,
 		},
 		isNewUser: isNewUser ?? true,
 		lastShownAnnouncementId,
@@ -585,6 +593,10 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 		fireworksModelId,
 		fireworksModelMaxCompletionTokens,
 		fireworksModelMaxTokens,
+		mifyApiKey,
+		mifyBaseUrl,
+		mifyModelId,
+		mifyModelInfo,
 	} = apiConfiguration
 	// Workspace state updates
 	await updateWorkspaceState(context, "apiProvider", apiProvider)
@@ -606,6 +618,8 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await updateWorkspaceState(context, "requestyModelInfo", requestyModelInfo)
 	await updateWorkspaceState(context, "togetherModelId", togetherModelId)
 	await updateWorkspaceState(context, "fireworksModelId", fireworksModelId)
+	await updateWorkspaceState(context, "mifyModelId", mifyModelId)
+	await updateWorkspaceState(context, "mifyModelInfo", mifyModelInfo)
 
 	// Global state updates
 	await updateGlobalState(context, "awsRegion", awsRegion)
@@ -637,6 +651,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await updateGlobalState(context, "fireworksModelMaxTokens", fireworksModelMaxTokens)
 	await updateGlobalState(context, "xaiBaseUrl", xaiBaseUrl)
 	await updateGlobalState(context, "openRouterBaseUrl", openRouterBaseUrl)
+	await updateGlobalState(context, "mifyBaseUrl", mifyBaseUrl)
 
 	// Secret updates
 	await storeSecret(context, "apiKey", apiKey)
@@ -661,6 +676,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await storeSecret(context, "sambanovaApiKey", sambanovaApiKey)
 	await storeSecret(context, "cerebrasApiKey", cerebrasApiKey)
 	await storeSecret(context, "nebiusApiKey", nebiusApiKey)
+	await storeSecret(context, "mifyApiKey", mifyApiKey)
 }
 
 export async function resetExtensionState(context: vscode.ExtensionContext) {
@@ -690,6 +706,7 @@ export async function resetExtensionState(context: vscode.ExtensionContext) {
 		"sambanovaApiKey",
 		"cerebrasApiKey",
 		"nebiusApiKey",
+		"mifyApiKey",
 	]
 	for (const key of secretKeys) {
 		await storeSecret(context, key, undefined)

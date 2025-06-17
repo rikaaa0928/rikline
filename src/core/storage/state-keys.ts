@@ -22,6 +22,7 @@ export type SecretKey =
 	| "nebiusApiKey"
 	| "sambanovaApiKey"
 	| "cerebrasApiKey"
+	| "mifyApiKey"
 
 export type GlobalStateKey =
 	| "awsRegion"
@@ -73,6 +74,7 @@ export type GlobalStateKey =
 	| "terminalReuseEnabled"
 	| "isNewUser"
 	| "httpProxy"
+	| "mifyBaseUrl"
 
 export type LocalStateKey =
 	| "localClineRulesToggles"
@@ -97,6 +99,8 @@ export type LocalStateKey =
 	| "requestyModelInfo"
 	| "togetherModelId"
 	| "fireworksModelId"
+	| "mifyModelId"
+	| "mifyModelInfo"
 	// Previous mode saved configurations (per workspace)
 	| "previousModeApiProvider"
 	| "previousModeModelId"

@@ -25,6 +25,7 @@ export type ApiProvider =
 	| "xai"
 	| "sambanova"
 	| "cerebras"
+	| "mify"
 
 export interface ApiHandlerOptions {
 	apiModelId?: string
@@ -91,6 +92,10 @@ export interface ApiHandlerOptions {
 	asksageApiKey?: string
 	xaiApiKey?: string
 	xaiBaseUrl?: string
+	mifyApiKey?: string
+	mifyBaseUrl?: string
+	mifyModelId?: string
+	mifyModelInfo?: OpenAiCompatibleModelInfo
 	thinkingBudgetTokens?: number
 	reasoningEffort?: string
 	sambanovaApiKey?: string
@@ -2410,4 +2415,16 @@ export const requestyDefaultModelInfo: ModelInfo = {
 	cacheWritesPrice: 3.75,
 	cacheReadsPrice: 0.3,
 	description: "Anthropic's most intelligent model. Highest level of intelligence and capability.",
+}
+
+// Mify
+export const mifyModelInfoSaneDefaults: OpenAiCompatibleModelInfo = {
+	maxTokens: 4096,
+	contextWindow: 4096,
+	supportsImages: false,
+	supportsPromptCache: false,
+	inputPrice: 0.001,
+	outputPrice: 0.002,
+	temperature: 0.7,
+	description: "小米智能助手平台，使用默认模型，无需配置模型ID",
 }

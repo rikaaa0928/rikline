@@ -190,4 +190,10 @@ message ApiConfiguration {
   // rikline add on
   optional string vertex_base_url = 72;
 	optional string vertex_credentials_path = 73;
+	
+	// Mify provider fields
+	optional string mify_api_key = 74;
+	optional string mify_base_url = 75;
+	optional string mify_model_id = 76;
+	optional string mify_model_info = 77; // stored as JSON string
 }

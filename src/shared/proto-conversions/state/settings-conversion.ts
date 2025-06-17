@@ -69,6 +69,12 @@ export function convertApiConfigurationToProtoApiConfiguration(config: ApiConfig
 		vertexBaseUrl: config.vertexBaseUrl,
 		vertexCredentialsPath: config.vertexCredentialsPath,
 
+		// Mify provider fields
+		mifyApiKey: config.mifyApiKey,
+		mifyBaseUrl: config.mifyBaseUrl,
+		mifyModelId: config.mifyModelId,
+		mifyModelInfo: config.mifyModelInfo ? JSON.stringify(config.mifyModelInfo) : undefined,
+
 		// Base URLs and endpoints
 		openaiBaseUrl: config.openAiBaseUrl,
 		ollamaBaseUrl: config.ollamaBaseUrl,
@@ -176,6 +182,12 @@ export function convertProtoApiConfigurationToApiConfiguration(protoConfig: Prot
 		vertexRegion: protoConfig.vertexRegion,
 		vertexBaseUrl: protoConfig.vertexBaseUrl,
 		vertexCredentialsPath: protoConfig.vertexCredentialsPath,
+
+		// Mify provider fields
+		mifyApiKey: protoConfig.mifyApiKey,
+		mifyBaseUrl: protoConfig.mifyBaseUrl,
+		mifyModelId: protoConfig.mifyModelId,
+		mifyModelInfo: protoConfig.mifyModelInfo ? JSON.parse(protoConfig.mifyModelInfo) : undefined,
 
 		// Base URLs and endpoints
 		openAiBaseUrl: protoConfig.openaiBaseUrl,
