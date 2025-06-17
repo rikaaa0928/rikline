@@ -43,7 +43,6 @@ interface ExtensionStateContextType extends ExtensionState {
 	filePaths: string[]
 	totalTasksSize: number | null
 	availableTerminalProfiles: TerminalProfile[]
-	httpProxy?: string // Added for HTTP Proxy setting
 
 	// View state
 	showMcp: boolean
@@ -78,7 +77,6 @@ interface ExtensionStateContextType extends ExtensionState {
 	setMcpMarketplaceCatalog: (value: McpMarketplaceCatalog) => void
 	setTotalTasksSize: (value: number | null) => void
 	setAvailableTerminalProfiles: (profiles: TerminalProfile[]) => void // Setter for profiles
-	setHttpProxy: (value: string | undefined) => void // Added for HTTP Proxy setting
 
 	// Refresh functions
 	refreshOpenRouterModels: () => void
@@ -201,7 +199,6 @@ export const ExtensionStateContextProvider: React.FC<{
 		defaultTerminalProfile: "default",
 		isNewUser: false,
 		mcpResponsesCollapsed: false, // Default value (expanded), will be overwritten by extension state
-		httpProxy: undefined, // Added for HTTP Proxy setting
 	})
 	const [didHydrateState, setDidHydrateState] = useState(false)
 	const [showWelcome, setShowWelcome] = useState(false)
@@ -834,13 +831,6 @@ export const ExtensionStateContextProvider: React.FC<{
 			setState((prevState) => ({
 				...prevState,
 				globalWorkflowToggles: toggles,
-			})),
-		setHttpProxy: (
-			value, // Added for HTTP Proxy setting
-		) =>
-			setState((prevState) => ({
-				...prevState,
-				httpProxy: value,
 			})),
 		setMcpTab,
 		setTotalTasksSize,

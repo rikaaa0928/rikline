@@ -237,5 +237,7 @@ message ModelsApiConfiguration {
 
    // rikline add on
   optional string vertex_base_url = 73;
-	optional string vertex_credentials_path = 74;
+  optional string vertex_credentials_path = 74;
+  optional string open_router_base_url = 75;
+  optional string xai_base_url = 76;
 }

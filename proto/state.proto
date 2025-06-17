@@ -102,7 +102,6 @@ message UpdateSettingsRequest {
   optional bool mcp_responses_collapsed = 10;
   optional bool mcp_rich_display_enabled = 11;
   optional int64 terminal_output_line_limit = 12;
-  optional string http_proxy = 13;
 }
 
 // Complete API Configuration message
@@ -222,4 +221,6 @@ message ApiConfiguration {
   // rikline add on
   optional string vertex_base_url = 77;
   optional string vertex_credentials_path = 78;
+  optional string open_router_base_url = 79;
+  optional string xai_base_url = 80;
 }

@@ -326,7 +326,6 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getGlobalState(context, "sapAiCoreTokenUrl") as Promise<string | undefined>,
 		getGlobalState(context, "sapAiResourceGroup") as Promise<string | undefined>,
 		getGlobalState(context, "sapAiCoreModelId") as Promise<string | undefined>,
-		getGlobalState(context, "httpProxy") as Promise<string | undefined>,
 	])
 
 	const localClineRulesToggles = (await getWorkspaceState(context, "localClineRulesToggles")) as ClineRulesToggles
@@ -555,7 +554,6 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		terminalOutputLineLimit: terminalOutputLineLimit ?? 500,
 		defaultTerminalProfile: defaultTerminalProfile ?? "default",
 		globalWorkflowToggles: globalWorkflowToggles || {},
-		httpProxy: (await getGlobalState(context, "httpProxy")) as string | undefined,
 	}
 }
 

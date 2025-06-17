@@ -103,6 +103,7 @@ export function convertApiConfigurationToProtoApiConfiguration(config: ApiConfig
 
 		// OpenRouter specific
 		openrouterProviderSorting: config.openRouterProviderSorting,
+		openRouterBaseUrl: config.openRouterBaseUrl,
 
 		// SAP AI Core specific
 		sapAiCoreClientId: config.sapAiCoreClientId,
@@ -121,6 +122,9 @@ export function convertApiConfigurationToProtoApiConfiguration(config: ApiConfig
 
 		// Arrays
 		favoritedModelIds: config.favoritedModelIds || [],
+
+		// xai specific
+		xaiBaseUrl: config.xaiApiKey,
 	})
 }
 

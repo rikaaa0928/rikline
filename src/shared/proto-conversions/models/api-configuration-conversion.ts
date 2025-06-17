@@ -376,6 +376,8 @@ export function convertApiConfigurationToProto(config: ApiConfiguration): ProtoA
 		sapAiResourceGroup: config.sapAiResourceGroup,
 		sapAiCoreTokenUrl: config.sapAiCoreTokenUrl,
 		sapAiCoreBaseUrl: config.sapAiCoreBaseUrl,
+		openRouterBaseUrl: config.openRouterBaseUrl,
+		xaiBaseUrl: config.xaiBaseUrl,
 	}
 }
 
@@ -456,5 +458,7 @@ export function convertProtoToApiConfiguration(protoConfig: ProtoApiConfiguratio
 		sapAiResourceGroup: protoConfig.sapAiResourceGroup,
 		sapAiCoreTokenUrl: protoConfig.sapAiCoreTokenUrl,
 		sapAiCoreBaseUrl: protoConfig.sapAiCoreBaseUrl,
+		openRouterBaseUrl: protoConfig.openRouterBaseUrl,
+		xaiBaseUrl: protoConfig.xaiBaseUrl,
 	}
 }
