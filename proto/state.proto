@@ -223,4 +223,10 @@ message ApiConfiguration {
   optional string vertex_credentials_path = 78;
   optional string open_router_base_url = 79;
   optional string xai_base_url = 80;
+
+	// Mify provider fields
+	optional string mify_api_key = 81;
+	optional string mify_base_url = 82;
+	optional string mify_model_id = 83;
+	optional string mify_model_info = 84; // stored as JSON string
 }

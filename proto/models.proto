@@ -122,6 +122,7 @@ enum ApiProvider {
   SAMBANOVA = 22;
   CEREBRAS = 23;
   SAPAICORE = 24;
+  MIFY = 25;
 }
 
 // Model info for OpenAI-compatible models
@@ -240,4 +241,10 @@ message ModelsApiConfiguration {
   optional string vertex_credentials_path = 74;
   optional string open_router_base_url = 75;
   optional string xai_base_url = 76;
+  
+  // Mify provider fields
+	optional string mify_api_key = 77;
+	optional string mify_base_url = 78;
+	optional string mify_model_id = 79;
+	optional OpenAiCompatibleModelInfo mify_model_info = 80;
 }

@@ -24,6 +24,7 @@ export type SecretKey =
 	| "cerebrasApiKey"
 	| "sapAiCoreClientId"
 	| "sapAiCoreClientSecret"
+	| "mifyApiKey"
 
 export type GlobalStateKey =
 	| "awsRegion"
@@ -84,6 +85,7 @@ export type GlobalStateKey =
 	| "sapAiCoreClientSecret"
 	| "sapAiCoreModelId"
 	| "httpProxy"
+	| "mifyBaseUrl"
 
 export type LocalStateKey =
 	| "localClineRulesToggles"
@@ -108,6 +110,8 @@ export type LocalStateKey =
 	| "requestyModelInfo"
 	| "togetherModelId"
 	| "fireworksModelId"
+	| "mifyModelId"
+	| "mifyModelInfo"
 	// Previous mode saved configurations (per workspace)
 	| "previousModeApiProvider"
 	| "previousModeModelId"

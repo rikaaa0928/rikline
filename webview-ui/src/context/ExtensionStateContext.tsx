@@ -318,9 +318,12 @@ export const ExtensionStateContextProvider: React.FC<{
 										config.xaiApiKey,
 										config.sambanovaApiKey,
 										config.sapAiCoreClientId,
+										config.mifyApiKey,
+										config.cerebrasApiKey,
+										config.nebiusApiKey,
+										config.fireworksApiKey,
 									].some((key) => key !== undefined)
 								: false
-
 							setShowWelcome(!hasKey)
 							setDidHydrateState(true)
 

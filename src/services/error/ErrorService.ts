@@ -21,20 +21,20 @@ export class ErrorService {
 
 	static initialize() {
 		// Initialize sentry
-		Sentry.init({
-			dsn: "https://7936780e3f0f0290fcf8d4a395c249b7@o4509028819664896.ingest.us.sentry.io/4509052955983872",
-			environment: process.env.NODE_ENV,
-			release: `cline@${pkg.version}`,
-			integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
-			beforeSend(event) {
-				// TelemetryService keeps track of whether the user has opted in to telemetry/error reporting
-				const isUserManuallyOptedIn = telemetryService.isTelemetryEnabled()
-				if (isUserManuallyOptedIn && ErrorService.isEnabled()) {
-					return event
-				}
-				return null
-			},
-		})
+		// Sentry.init({
+		// 	dsn: "https://7936780e3f0f0290fcf8d4a395c249b7@o4509028819664896.ingest.us.sentry.io/4509052955983872",
+		// 	environment: process.env.NODE_ENV,
+		// 	release: `cline@${pkg.version}`,
+		// 	integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
+		// 	beforeSend(event) {
+		// 		// TelemetryService keeps track of whether the user has opted in to telemetry/error reporting
+		// 		const isUserManuallyOptedIn = telemetryService.isTelemetryEnabled()
+		// 		if (isUserManuallyOptedIn && ErrorService.isEnabled()) {
+		// 			return event
+		// 		}
+		// 		return null
+		// 	},
+		// })
 
 		ErrorService.toggleEnabled(true)
 		ErrorService.setLevel("error")

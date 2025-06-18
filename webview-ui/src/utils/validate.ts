@@ -127,6 +127,16 @@ export function validateApiConfiguration(apiConfiguration?: ApiConfiguration): s
 					return "You must provide a valid Auth URL or choose a different provider."
 				}
 				break
+			case "cerebras":
+				if (!apiConfiguration.cerebrasApiKey) {
+					return "You must provide a valid API key or choose a different provider."
+				}
+				break
+			case "mify":
+				if (!apiConfiguration.mifyApiKey || !apiConfiguration.mifyBaseUrl) {
+					return "You must provide a valid API key and base URL."
+				}
+				break
 		}
 	}
 	return undefined

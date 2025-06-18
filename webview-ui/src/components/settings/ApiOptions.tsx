@@ -48,6 +48,7 @@ import {
 	xaiModels,
 	sapAiCoreDefaultModelId,
 	sapAiCoreModels,
+	mifyModelInfoSaneDefaults,
 } from "@shared/api"
 import { EmptyRequest, StringRequest } from "@shared/proto/common"
 import { OpenAiModelsRequest, UpdateApiConfigurationRequest } from "@shared/proto/models"
@@ -378,6 +379,7 @@ const ApiOptions = ({
 					<VSCodeOption value="sambanova">SambaNova</VSCodeOption>
 					<VSCodeOption value="cerebras">Cerebras</VSCodeOption>
 					<VSCodeOption value="sapaicore">SAP AI Core</VSCodeOption>
+					<VSCodeOption value="mify">Mify</VSCodeOption>
 				</VSCodeDropdown>
 			</DropdownContainer>
 
@@ -2277,6 +2279,7 @@ const ApiOptions = ({
 				selectedProvider !== "litellm" &&
 				selectedProvider !== "requesty" &&
 				selectedProvider !== "bedrock" &&
+				selectedProvider !== "mify" &&
 				showModelOptions && (
 					<>
 						<DropdownContainer zIndex={DROPDOWN_Z_INDEX - 2} className="dropdown-container">
@@ -2386,6 +2389,59 @@ const ApiOptions = ({
 					}}>
 					{modelIdErrorMessage}
 				</p>
+			)}
+
+			{selectedProvider === "mify" && (
+				<div style={{ marginTop: "10px" }}>
+					<div style={{ marginBottom: "4px", fontSize: "11px", fontWeight: "500" }}>Base URL</div>
+					<VSCodeTextField
+						value={apiConfiguration?.mifyBaseUrl || ""}
+						style={{ width: "100%" }}
+						onInput={handleInputChange("mifyBaseUrl")}
+						placeholder="输入Mify Base URL (例如: https://api.mify.xxx)"
+					/>
+					<div style={{ marginBottom: "4px", marginTop: "10px", fontSize: "11px", fontWeight: "500" }}>API Key</div>
+					<VSCodeTextField
+						value={apiConfiguration?.mifyApiKey || ""}
+						style={{ width: "100%" }}
+						onInput={handleInputChange("mifyApiKey")}
+						placeholder="输入Mify API Key"
+					/>
+					<div style={{ marginTop: "8px", fontSize: "11px", color: "var(--vscode-descriptionForeground)" }}>
+						注意:Mify服务使用Mify应用中配置的默认模型，无需配置模型ID.
+					</div>
+				</div>
+			)}
+
+			{selectedProvider === "sambanova" && (
+				<div>
+					<VSCodeTextField
+						value={apiConfiguration?.sambanovaApiKey || ""}
+						style={{ width: "100%" }}
+						type="password"
+						onInput={handleInputChange("sambanovaApiKey")}
+						placeholder="Enter API Key...">
+						<span style={{ fontWeight: 500 }}>SambaNova API Key</span>
+					</VSCodeTextField>
+					<p
+						style={{
+							fontSize: "12px",
+							marginTop: 3,
+							color: "var(--vscode-descriptionForeground)",
+						}}>
+						This key is stored locally and only used to make API requests from this extension.
+						{!apiConfiguration?.sambanovaApiKey && (
+							<VSCodeLink
+								href="https://docs.sambanova.ai/cloud/docs/get-started/overview"
+								style={{
+									display: "inline",
+									fontSize: "inherit",
+								}}>
+								You can get a SambaNova API key by signing up here.
+							</VSCodeLink>
+						)}
+					</p>
+				</div>
 			)}
 		</div>
 	)
@@ -2734,6 +2790,12 @@ export function normalizeApiConfiguration(apiConfiguration?: ApiConfiguration): 
 			return getProviderData(cerebrasModels, cerebrasDefaultModelId)
 		case "sapaicore":
 			return getProviderData(sapAiCoreModels, sapAiCoreDefaultModelId)
+		case "mify":
+			return {
+				selectedProvider: provider,
+				selectedModelId: "mify-default", // 使用固定的模型ID
+				selectedModelInfo: apiConfiguration?.mifyModelInfo || mifyModelInfoSaneDefaults,
+			}
 		default:
 			return getProviderData(anthropicModels, anthropicDefaultModelId)
 	}

@@ -236,6 +236,8 @@ function convertApiProviderToProto(provider: string | undefined): ProtoApiProvid
 			return ProtoApiProvider.CEREBRAS
 		case "sapaicore":
 			return ProtoApiProvider.SAPAICORE
+		case "mify":
+			return ProtoApiProvider.MIFY
 		default:
 			return ProtoApiProvider.ANTHROPIC
 	}
@@ -294,6 +296,8 @@ function convertProtoToApiProvider(provider: ProtoApiProvider): ApiProvider {
 			return "cerebras"
 		case ProtoApiProvider.SAPAICORE:
 			return "sapaicore"
+		case ProtoApiProvider.MIFY:
+			return "mify"
 		default:
 			return "anthropic"
 	}
@@ -378,6 +382,10 @@ export function convertApiConfigurationToProto(config: ApiConfiguration): ProtoA
 		sapAiCoreBaseUrl: config.sapAiCoreBaseUrl,
 		openRouterBaseUrl: config.openRouterBaseUrl,
 		xaiBaseUrl: config.xaiBaseUrl,
+		mifyApiKey: config.mifyApiKey,
+		mifyBaseUrl: config.mifyBaseUrl,
+		mifyModelId: config.mifyModelId,
+		mifyModelInfo: convertOpenAiCompatibleModelInfoToProto(config.mifyModelInfo),
 	}
 }
 
@@ -460,5 +468,9 @@ export function convertProtoToApiConfiguration(protoConfig: ProtoApiConfiguratio
 		sapAiCoreBaseUrl: protoConfig.sapAiCoreBaseUrl,
 		openRouterBaseUrl: protoConfig.openRouterBaseUrl,
 		xaiBaseUrl: protoConfig.xaiBaseUrl,
+		mifyApiKey: protoConfig.mifyApiKey,
+		mifyBaseUrl: protoConfig.mifyBaseUrl,
+		mifyModelId: protoConfig.mifyModelId,
+		mifyModelInfo: convertProtoToOpenAiCompatibleModelInfo(protoConfig.mifyModelInfo),
 	}
 }
