@@ -1656,6 +1656,7 @@ export class Task {
 		})
 
 		await this.migrateDisableBrowserToolSetting()
+		// TODO: mify 如果选了claude4,也要适配一下
 		const disableBrowserTool = this.browserSettings.disableToolUse ?? false
 		// cline browser tool uses image recognition for navigation (requires model image support).
 		const modelSupportsBrowserUse = this.api.getModel().info.supportsImages ?? false
