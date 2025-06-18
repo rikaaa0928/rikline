@@ -6,8 +6,8 @@ import { cn } from "@/utils/cn"
 import { validateApiConfiguration, validateModelId } from "@/utils/validate"
 import { vscode } from "@/utils/vscode"
 import { ExtensionMessage } from "@shared/ExtensionMessage"
-import { EmptyRequest } from "@shared/proto/common"
-import { PlanActMode, TogglePlanActModeRequest, UpdateSettingsRequest } from "@shared/proto/state"
+import { EmptyRequest, StringRequest } from "@shared/proto/common"
+import { PlanActMode, ResetStateRequest, TogglePlanActModeRequest, UpdateSettingsRequest } from "@shared/proto/state"
 import { VSCodeButton, VSCodeCheckbox, VSCodeLink, VSCodeTextArea } from "@vscode/webview-ui-toolkit/react"
 import { CheckCheck, FlaskConical, Info, LucideIcon, Settings, SquareMousePointer, SquareTerminal, Webhook } from "lucide-react"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
@@ -18,7 +18,6 @@ import ApiOptions from "./ApiOptions"
 import BrowserSettingsSection from "./BrowserSettingsSection"
 import FeatureSettingsSection from "./FeatureSettingsSection"
 import PreferredLanguageSetting from "./PreferredLanguageSetting" // Added import
-import ProxySetting from "./ProxySetting" // Added import
 import Section from "./Section"
 import SectionHeader from "./SectionHeader"
 import TerminalSettingsSection from "./TerminalSettingsSection"
@@ -127,15 +126,19 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		setEnableCheckpointsSetting,
 		mcpMarketplaceEnabled,
 		setMcpMarketplaceEnabled,
+		mcpRichDisplayEnabled,
+		setMcpRichDisplayEnabled,
 		shellIntegrationTimeout,
 		setShellIntegrationTimeout,
+		terminalOutputLineLimit,
+		setTerminalOutputLineLimit,
 		terminalReuseEnabled,
 		setTerminalReuseEnabled,
+		defaultTerminalProfile,
+		setDefaultTerminalProfile,
 		mcpResponsesCollapsed,
 		setMcpResponsesCollapsed,
 		setApiConfiguration,
-		httpProxy, // Added for HTTP Proxy
-		setHttpProxy, // Added for HTTP Proxy
 	} = useExtensionState()
 
 	// Store the original state to detect changes
@@ -145,11 +148,13 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		planActSeparateModelsSetting,
 		enableCheckpointsSetting,
 		mcpMarketplaceEnabled,
+		mcpRichDisplayEnabled,
 		mcpResponsesCollapsed,
 		chatSettings,
 		shellIntegrationTimeout,
 		terminalReuseEnabled,
-		httpProxy, // Added for HTTP Proxy
+		terminalOutputLineLimit,
+		defaultTerminalProfile,
 	})
 	const [apiErrorMessage, setApiErrorMessage] = useState<string | undefined>(undefined)
 	const [modelIdErrorMessage, setModelIdErrorMessage] = useState<string | undefined>(undefined)
@@ -184,16 +189,40 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 					telemetrySetting,
 					enableCheckpointsSetting,
 					mcpMarketplaceEnabled,
+					mcpRichDisplayEnabled,
 					shellIntegrationTimeout,
 					terminalReuseEnabled,
 					mcpResponsesCollapsed,
-					httpProxy: httpProxy, // Added for HTTP Proxy
 					apiConfiguration: apiConfigurationToSubmit
 						? convertApiConfigurationToProtoApiConfiguration(apiConfigurationToSubmit)
 						: undefined,
 					chatSettings: chatSettings ? convertChatSettingsToProtoChatSettings(chatSettings) : undefined,
+					terminalOutputLineLimit,
 				}),
 			)
+
+			// Update default terminal profile if it has changed
+			if (defaultTerminalProfile !== originalState.current.defaultTerminalProfile) {
+				await StateServiceClient.updateDefaultTerminalProfile({
+					value: defaultTerminalProfile || "default",
+				} as StringRequest)
+			}
+
+			// Update the original state to reflect the saved changes
+			originalState.current = {
+				apiConfiguration,
+				telemetrySetting,
+				planActSeparateModelsSetting,
+				enableCheckpointsSetting,
+				mcpMarketplaceEnabled,
+				mcpRichDisplayEnabled,
+				mcpResponsesCollapsed,
+				chatSettings,
+				shellIntegrationTimeout,
+				terminalReuseEnabled,
+				terminalOutputLineLimit,
+				defaultTerminalProfile,
+			}
 		} catch (error) {
 			console.error("Failed to update settings:", error)
 		}
@@ -216,11 +245,14 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 			planActSeparateModelsSetting !== originalState.current.planActSeparateModelsSetting ||
 			enableCheckpointsSetting !== originalState.current.enableCheckpointsSetting ||
 			mcpMarketplaceEnabled !== originalState.current.mcpMarketplaceEnabled ||
+			mcpRichDisplayEnabled !== originalState.current.mcpRichDisplayEnabled ||
+			JSON.stringify(chatSettings) !== JSON.stringify(originalState.current.chatSettings) ||
 			mcpResponsesCollapsed !== originalState.current.mcpResponsesCollapsed ||
 			JSON.stringify(chatSettings) !== JSON.stringify(originalState.current.chatSettings) ||
 			shellIntegrationTimeout !== originalState.current.shellIntegrationTimeout ||
+			terminalOutputLineLimit !== originalState.current.terminalOutputLineLimit ||
 			terminalReuseEnabled !== originalState.current.terminalReuseEnabled ||
-			httpProxy !== originalState.current.httpProxy // Added for HTTP Proxy
+			defaultTerminalProfile !== originalState.current.defaultTerminalProfile
 
 		setHasUnsavedChanges(hasChanges)
 	}, [
@@ -229,11 +261,13 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		planActSeparateModelsSetting,
 		enableCheckpointsSetting,
 		mcpMarketplaceEnabled,
+		mcpRichDisplayEnabled,
 		mcpResponsesCollapsed,
 		chatSettings,
 		shellIntegrationTimeout,
 		terminalReuseEnabled,
-		httpProxy, // Added for HTTP Proxy
+		terminalOutputLineLimit,
+		defaultTerminalProfile,
 	])
 
 	// Handle cancel button click
@@ -263,19 +297,28 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 							: false,
 					)
 				}
+				if (typeof setMcpRichDisplayEnabled === "function") {
+					setMcpRichDisplayEnabled(
+						typeof originalState.current.mcpRichDisplayEnabled === "boolean"
+							? originalState.current.mcpRichDisplayEnabled
+							: true,
+					)
+				}
 				// Reset terminal settings
 				if (typeof setShellIntegrationTimeout === "function") {
 					setShellIntegrationTimeout(originalState.current.shellIntegrationTimeout)
 				}
+				if (typeof setTerminalOutputLineLimit === "function") {
+					setTerminalOutputLineLimit(originalState.current.terminalOutputLineLimit)
+				}
 				if (typeof setTerminalReuseEnabled === "function") {
 					setTerminalReuseEnabled(originalState.current.terminalReuseEnabled ?? true)
 				}
+				if (typeof setDefaultTerminalProfile === "function") {
+					setDefaultTerminalProfile(originalState.current.defaultTerminalProfile ?? "default")
+				}
 				if (typeof setMcpResponsesCollapsed === "function") {
 					setMcpResponsesCollapsed(originalState.current.mcpResponsesCollapsed ?? false)
-				}
-				if (typeof setHttpProxy === "function") {
-					// Added for HTTP Proxy
-					setHttpProxy(originalState.current.httpProxy ?? undefined)
 				}
 				// Close settings view
 				onDone()
@@ -293,8 +336,8 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 		setApiConfiguration,
 		setEnableCheckpointsSetting,
 		setMcpMarketplaceEnabled,
+		setMcpRichDisplayEnabled,
 		setMcpResponsesCollapsed,
-		setHttpProxy, // Added for HTTP Proxy
 	])
 
 	// Handle confirmation dialog actions
@@ -363,9 +406,13 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 
 	useEvent("message", handleMessage)
 
-	const handleResetState = async () => {
+	const handleResetState = async (resetGlobalState?: boolean) => {
 		try {
-			await StateServiceClient.resetState(EmptyRequest.create({}))
+			await StateServiceClient.resetState(
+				ResetStateRequest.create({
+					global: resetGlobalState,
+				}),
+			)
 		} catch (error) {
 			console.error("Failed to reset state:", error)
 		}
@@ -600,9 +647,6 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 												setChatSettings={setChatSettings}
 											/>
 										)}
-										{typeof setHttpProxy === "function" && (
-											<ProxySetting httpProxy={httpProxy} setHttpProxy={setHttpProxy} />
-										)}
 
 										<div className="mb-[5px]">
 											<VSCodeCheckbox
@@ -669,10 +713,16 @@ const SettingsView = ({ onDone, targetSection }: SettingsViewProps) => {
 									{renderSectionHeader("debug")}
 									<Section>
 										<VSCodeButton
-											onClick={handleResetState}
+											onClick={() => handleResetState()}
 											className="mt-[5px] w-auto"
 											style={{ backgroundColor: "var(--vscode-errorForeground)", color: "black" }}>
-											Reset State
+											Reset Workspace State
+										</VSCodeButton>
+										<VSCodeButton
+											onClick={() => handleResetState(true)}
+											className="mt-[5px] w-auto"
+											style={{ backgroundColor: "var(--vscode-errorForeground)", color: "black" }}>
+											Reset Global State
 										</VSCodeButton>
 										<p className="text-xs mt-[5px] text-[var(--vscode-descriptionForeground)]">
 											This will reset all global state and secret storage in the extension.

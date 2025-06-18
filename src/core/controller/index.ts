@@ -61,22 +61,6 @@ export class Controller {
 	accountService: ClineAccountService
 	latestAnnouncementId = "may-22-2025_16:11:00" // update to some unique identifier when we add a new announcement
 
-	private async applyHttpProxy(proxyUrl?: string) {
-		if (proxyUrl && proxyUrl.trim() !== "") {
-			process.env.HTTP_PROXY = proxyUrl
-			process.env.HTTPS_PROXY = proxyUrl
-			process.env.http_proxy = proxyUrl
-			process.env.https_proxy = proxyUrl
-			this.outputChannel.appendLine(`Applied HTTP Proxy: ${proxyUrl}`)
-		} else {
-			delete process.env.HTTP_PROXY
-			delete process.env.HTTPS_PROXY
-			delete process.env.http_proxy
-			delete process.env.https_proxy
-			this.outputChannel.appendLine("Cleared HTTP Proxy settings.")
-		}
-	}
-
 	constructor(
 		readonly context: vscode.ExtensionContext,
 		private readonly outputChannel: vscode.OutputChannel,
@@ -104,17 +88,6 @@ export class Controller {
 		cleanupLegacyCheckpoints(this.context.globalStorageUri.fsPath, this.outputChannel).catch((error) => {
 			console.error("Failed to cleanup legacy checkpoints:", error)
 		})
-
-		// Apply HTTP proxy setting on startup
-		getGlobalState(this.context, "httpProxy")
-			.then((proxy) => {
-				if (typeof proxy === "string") {
-					this.applyHttpProxy(proxy)
-				}
-			})
-			.catch((error) => {
-				console.error("Failed to apply HTTP proxy on startup:", error)
-			})
 	}
 
 	/*
@@ -162,6 +135,8 @@ export class Controller {
 			chatSettings,
 			shellIntegrationTimeout,
 			terminalReuseEnabled,
+			terminalOutputLineLimit,
+			defaultTerminalProfile,
 			enableCheckpointsSetting,
 			isNewUser,
 			taskHistory,
@@ -197,6 +172,8 @@ export class Controller {
 			chatSettings,
 			shellIntegrationTimeout,
 			terminalReuseEnabled ?? true,
+			terminalOutputLineLimit ?? 500,
+			defaultTerminalProfile ?? "default",
 			enableCheckpointsSetting ?? true,
 			task,
 			images,
@@ -247,6 +224,7 @@ export class Controller {
 				await this.postStateToWebview()
 				break
 			}
+
 			case "clearAllTaskHistory": {
 				const answer = await vscode.window.showWarningMessage(
 					"What would you like to delete?",
@@ -307,6 +285,12 @@ export class Controller {
 			previousModeReasoningEffort: newReasoningEffort,
 			previousModeAwsBedrockCustomSelected: newAwsBedrockCustomSelected,
 			previousModeAwsBedrockCustomModelBaseId: newAwsBedrockCustomModelBaseId,
+			previousModeSapAiCoreClientId: newSapAiCoreClientId,
+			previousModeSapAiCoreClientSecret: newSapAiCoreClientSecret,
+			previousModeSapAiCoreBaseUrl: newSapAiCoreBaseUrl,
+			previousModeSapAiCoreTokenUrl: newSapAiCoreTokenUrl,
+			previousModeSapAiCoreResourceGroup: newSapAiResourceGroup,
+			previousModeSapAiCoreModelId: newSapAiCoreModelId,
 			planActSeparateModelsSetting,
 		} = await getAllExtensionState(this.context)
 
@@ -372,6 +356,23 @@ export class Controller {
 					await updateWorkspaceState(this.context, "previousModeModelId", apiConfiguration.requestyModelId)
 					await updateWorkspaceState(this.context, "previousModeModelInfo", apiConfiguration.requestyModelInfo)
 					break
+				case "sapaicore":
+					await updateWorkspaceState(this.context, "previousModeModelId", apiConfiguration.apiModelId)
+					await updateWorkspaceState(this.context, "previousModeSapAiCoreClientId", apiConfiguration.sapAiCoreClientId)
+					await updateWorkspaceState(
+						this.context,
+						"previousModeSapAiCoreClientSecret",
+						apiConfiguration.sapAiCoreClientSecret,
+					)
+					await updateWorkspaceState(this.context, "previousModeSapAiCoreBaseUrl", apiConfiguration.sapAiCoreBaseUrl)
+					await updateWorkspaceState(this.context, "previousModeSapAiCoreTokenUrl", apiConfiguration.sapAiCoreTokenUrl)
+					await updateWorkspaceState(
+						this.context,
+						"previousModeSapAiCoreResourceGroup",
+						apiConfiguration.sapAiResourceGroup,
+					)
+					await updateWorkspaceState(this.context, "previousModeSapAiCoreModelId", apiConfiguration.sapAiCoreModelId)
+					break
 			}
 
 			// Restore the model used in previous mode
@@ -426,6 +427,9 @@ export class Controller {
 					case "requesty":
 						await updateWorkspaceState(this.context, "requestyModelId", newModelId)
 						await updateWorkspaceState(this.context, "requestyModelInfo", newModelInfo)
+						break
+					case "sapaicore":
+						await updateWorkspaceState(this.context, "apiModelId", newModelId)
 						break
 				}
 
@@ -972,6 +976,7 @@ export class Controller {
 			chatSettings,
 			userInfo,
 			mcpMarketplaceEnabled,
+			mcpRichDisplayEnabled,
 			telemetrySetting,
 			planActSeparateModelsSetting,
 			enableCheckpointsSetting,
@@ -979,9 +984,10 @@ export class Controller {
 			globalWorkflowToggles,
 			shellIntegrationTimeout,
 			terminalReuseEnabled,
+			defaultTerminalProfile,
 			isNewUser,
 			mcpResponsesCollapsed,
-			httpProxy, // Added for HTTP Proxy
+			terminalOutputLineLimit,
 		} = await getAllExtensionState(this.context)
 
 		const localClineRulesToggles =
@@ -1013,6 +1019,7 @@ export class Controller {
 			chatSettings,
 			userInfo,
 			mcpMarketplaceEnabled,
+			mcpRichDisplayEnabled,
 			telemetrySetting,
 			planActSeparateModelsSetting,
 			enableCheckpointsSetting: enableCheckpointsSetting ?? true,
@@ -1025,9 +1032,10 @@ export class Controller {
 			globalWorkflowToggles: globalWorkflowToggles || {},
 			shellIntegrationTimeout,
 			terminalReuseEnabled,
+			defaultTerminalProfile,
 			isNewUser,
 			mcpResponsesCollapsed,
-			httpProxy: (await getGlobalState(this.context, "httpProxy")) as string | undefined,
+			terminalOutputLineLimit,
 		}
 	}
 
@@ -1207,14 +1215,4 @@ Commit message:`
 	}
 
 	// dev
-
-	// NOTE TO DEVELOPER:
-	// The gRPC handler for `StateService.updateSettings` needs to be updated
-	// to handle the `httpProxy` field from `UpdateSettingsRequest`.
-	// When `httpProxy` is received, it should:
-	// 1. Save the setting:
-	//    `await updateGlobalState(this.context, "httpProxy", request.httpProxy)`
-	// 2. Apply the setting using the new helper method:
-	//    `await this.applyHttpProxy(request.httpProxy)`
-	// 3. Ensure `postStateToWebview()` is called to update the UI.
 }

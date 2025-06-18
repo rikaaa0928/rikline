@@ -238,9 +238,18 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		shellIntegrationTimeout,
 		enableCheckpointsSettingRaw,
 		mcpMarketplaceEnabledRaw,
+		mcpRichDisplayEnabled,
 		mcpResponsesCollapsedRaw,
 		globalWorkflowToggles,
 		terminalReuseEnabled,
+		terminalOutputLineLimit,
+		defaultTerminalProfile,
+		sapAiCoreClientId,
+		sapAiCoreClientSecret,
+		sapAiCoreBaseUrl,
+		sapAiCoreTokenUrl,
+		sapAiResourceGroup,
+		sapAiCoreModelId,
 	] = await Promise.all([
 		getGlobalState(context, "isNewUser") as Promise<boolean | undefined>,
 		getSecret(context, "apiKey") as Promise<string | undefined>,
@@ -305,10 +314,18 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getGlobalState(context, "shellIntegrationTimeout") as Promise<number | undefined>,
 		getGlobalState(context, "enableCheckpointsSetting") as Promise<boolean | undefined>,
 		getGlobalState(context, "mcpMarketplaceEnabled") as Promise<boolean | undefined>,
+		getGlobalState(context, "mcpRichDisplayEnabled") as Promise<boolean | undefined>,
 		getGlobalState(context, "mcpResponsesCollapsed") as Promise<boolean | undefined>,
 		getGlobalState(context, "globalWorkflowToggles") as Promise<ClineRulesToggles | undefined>,
 		getGlobalState(context, "terminalReuseEnabled") as Promise<boolean | undefined>,
-		getGlobalState(context, "httpProxy") as Promise<string | undefined>,
+		getGlobalState(context, "terminalOutputLineLimit") as Promise<number | undefined>,
+		getGlobalState(context, "defaultTerminalProfile") as Promise<string | undefined>,
+		getSecret(context, "sapAiCoreClientId") as Promise<string | undefined>,
+		getSecret(context, "sapAiCoreClientSecret") as Promise<string | undefined>,
+		getGlobalState(context, "sapAiCoreBaseUrl") as Promise<string | undefined>,
+		getGlobalState(context, "sapAiCoreTokenUrl") as Promise<string | undefined>,
+		getGlobalState(context, "sapAiResourceGroup") as Promise<string | undefined>,
+		getGlobalState(context, "sapAiCoreModelId") as Promise<string | undefined>,
 	])
 
 	const localClineRulesToggles = (await getWorkspaceState(context, "localClineRulesToggles")) as ClineRulesToggles
@@ -344,6 +361,12 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		previousModeReasoningEffort,
 		previousModeAwsBedrockCustomSelected,
 		previousModeAwsBedrockCustomModelBaseId,
+		previousModeSapAiCoreClientId,
+		previousModeSapAiCoreClientSecret,
+		previousModeSapAiCoreBaseUrl,
+		previousModeSapAiCoreTokenUrl,
+		previousModeSapAiCoreResourceGroup,
+		previousModeSapAiCoreModelId,
 	] = await Promise.all([
 		getWorkspaceState(context, "chatSettings") as Promise<ChatSettings | undefined>,
 		getWorkspaceState(context, "apiProvider") as Promise<ApiProvider | undefined>,
@@ -375,6 +398,12 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getWorkspaceState(context, "previousModeReasoningEffort") as Promise<string | undefined>,
 		getWorkspaceState(context, "previousModeAwsBedrockCustomSelected") as Promise<boolean | undefined>,
 		getWorkspaceState(context, "previousModeAwsBedrockCustomModelBaseId") as Promise<BedrockModelId | undefined>,
+		getWorkspaceState(context, "previousModeSapAiCoreClientId") as Promise<string | undefined>,
+		getWorkspaceState(context, "previousModeSapAiCoreClientSecret") as Promise<string | undefined>,
+		getWorkspaceState(context, "previousModeSapAiCoreBaseUrl") as Promise<string | undefined>,
+		getWorkspaceState(context, "previousModeSapAiCoreTokenUrl") as Promise<string | undefined>,
+		getWorkspaceState(context, "previousModeSapAiCoreResourceGroup") as Promise<string | undefined>,
+		getWorkspaceState(context, "previousModeSapAiCoreModelId") as Promise<string | undefined>,
 	])
 
 	let apiProvider: ApiProvider
@@ -485,6 +514,12 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 			nebiusApiKey,
 			favoritedModelIds,
 			requestTimeoutMs,
+			sapAiCoreClientId,
+			sapAiCoreClientSecret,
+			sapAiCoreBaseUrl,
+			sapAiCoreTokenUrl,
+			sapAiResourceGroup,
+			sapAiCoreModelId,
 			mifyApiKey: (await getSecret(context, "mifyApiKey")) as string | undefined,
 			mifyBaseUrl: (await getGlobalState(context, "mifyBaseUrl")) as string | undefined,
 			mifyModelId,
@@ -510,15 +545,23 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		previousModeReasoningEffort,
 		previousModeAwsBedrockCustomSelected,
 		previousModeAwsBedrockCustomModelBaseId,
+		previousModeSapAiCoreClientId,
+		previousModeSapAiCoreClientSecret,
+		previousModeSapAiCoreBaseUrl,
+		previousModeSapAiCoreTokenUrl,
+		previousModeSapAiCoreResourceGroup,
+		previousModeSapAiCoreModelId,
 		mcpMarketplaceEnabled: mcpMarketplaceEnabled,
+		mcpRichDisplayEnabled: mcpRichDisplayEnabled ?? true,
 		mcpResponsesCollapsed: mcpResponsesCollapsed,
 		telemetrySetting: telemetrySetting || "unset",
 		planActSeparateModelsSetting,
 		enableCheckpointsSetting: enableCheckpointsSetting,
 		shellIntegrationTimeout: shellIntegrationTimeout || 4000,
 		terminalReuseEnabled: terminalReuseEnabled ?? true,
+		terminalOutputLineLimit: terminalOutputLineLimit ?? 500,
+		defaultTerminalProfile: defaultTerminalProfile ?? "default",
 		globalWorkflowToggles: globalWorkflowToggles || {},
-		httpProxy: (await getGlobalState(context, "httpProxy")) as string | undefined,
 	}
 }
 
@@ -593,6 +636,12 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 		fireworksModelId,
 		fireworksModelMaxCompletionTokens,
 		fireworksModelMaxTokens,
+		sapAiCoreClientId,
+		sapAiCoreClientSecret,
+		sapAiCoreBaseUrl,
+		sapAiCoreTokenUrl,
+		sapAiResourceGroup,
+		sapAiCoreModelId,
 		mifyApiKey,
 		mifyBaseUrl,
 		mifyModelId,
@@ -649,6 +698,12 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await updateGlobalState(context, "requestTimeoutMs", apiConfiguration.requestTimeoutMs)
 	await updateGlobalState(context, "fireworksModelMaxCompletionTokens", fireworksModelMaxCompletionTokens)
 	await updateGlobalState(context, "fireworksModelMaxTokens", fireworksModelMaxTokens)
+	await updateGlobalState(context, "favoritedModelIds", favoritedModelIds)
+	await updateGlobalState(context, "requestTimeoutMs", apiConfiguration.requestTimeoutMs)
+	await updateGlobalState(context, "sapAiCoreBaseUrl", sapAiCoreBaseUrl)
+	await updateGlobalState(context, "sapAiCoreTokenUrl", sapAiCoreTokenUrl)
+	await updateGlobalState(context, "sapAiResourceGroup", sapAiResourceGroup)
+	await updateGlobalState(context, "sapAiCoreModelId", sapAiCoreModelId)
 	await updateGlobalState(context, "xaiBaseUrl", xaiBaseUrl)
 	await updateGlobalState(context, "openRouterBaseUrl", openRouterBaseUrl)
 	await updateGlobalState(context, "mifyBaseUrl", mifyBaseUrl)
@@ -676,10 +731,19 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await storeSecret(context, "sambanovaApiKey", sambanovaApiKey)
 	await storeSecret(context, "cerebrasApiKey", cerebrasApiKey)
 	await storeSecret(context, "nebiusApiKey", nebiusApiKey)
+	await storeSecret(context, "sapAiCoreClientId", sapAiCoreClientId)
+	await storeSecret(context, "sapAiCoreClientSecret", sapAiCoreClientSecret)
 	await storeSecret(context, "mifyApiKey", mifyApiKey)
 }
 
-export async function resetExtensionState(context: vscode.ExtensionContext) {
+export async function resetWorkspaceState(context: vscode.ExtensionContext) {
+	for (const key of context.workspaceState.keys()) {
+		await context.workspaceState.update(key, undefined)
+	}
+}
+
+export async function resetGlobalState(context: vscode.ExtensionContext) {
+	// TODO: Reset all workspace states?
 	for (const key of context.globalState.keys()) {
 		await context.globalState.update(key, undefined)
 	}

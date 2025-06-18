@@ -25,6 +25,7 @@ import { AskSageHandler } from "./providers/asksage"
 import { XAIHandler } from "./providers/xai"
 import { SambanovaHandler } from "./providers/sambanova"
 import { CerebrasHandler } from "./providers/cerebras"
+import { SapAiCoreHandler } from "./providers/sapaicore"
 import { MifyHandler } from "./providers/mify"
 
 export interface ApiHandler {
@@ -88,6 +89,8 @@ export function buildApiHandler(configuration: ApiConfiguration): ApiHandler {
 			return new SambanovaHandler(options)
 		case "cerebras":
 			return new CerebrasHandler(options)
+		case "sapaicore":
+			return new SapAiCoreHandler(options)
 		case "mify":
 			return new MifyHandler(options)
 		default:

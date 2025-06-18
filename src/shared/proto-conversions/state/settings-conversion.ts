@@ -109,6 +109,14 @@ export function convertApiConfigurationToProtoApiConfiguration(config: ApiConfig
 
 		// OpenRouter specific
 		openrouterProviderSorting: config.openRouterProviderSorting,
+		openRouterBaseUrl: config.openRouterBaseUrl,
+
+		// SAP AI Core specific
+		sapAiCoreClientId: config.sapAiCoreClientId,
+		sapAiCoreClientSecret: config.sapAiCoreClientSecret,
+		sapAiCoreBaseUrl: config.sapAiCoreBaseUrl,
+		sapAiCoreTokenUrl: config.sapAiCoreTokenUrl,
+		sapAiResourceGroup: config.sapAiResourceGroup,
 
 		// Complex objects stored as JSON strings
 		vscodeLmModelSelector: config.vsCodeLmModelSelector ? JSON.stringify(config.vsCodeLmModelSelector) : undefined,
@@ -120,6 +128,9 @@ export function convertApiConfigurationToProtoApiConfiguration(config: ApiConfig
 
 		// Arrays
 		favoritedModelIds: config.favoritedModelIds || [],
+
+		// xai specific
+		xaiBaseUrl: config.xaiApiKey,
 	})
 }
 
@@ -223,6 +234,13 @@ export function convertProtoApiConfigurationToApiConfiguration(protoConfig: Prot
 
 		// OpenRouter specific
 		openRouterProviderSorting: protoConfig.openrouterProviderSorting,
+
+		// SAP AI Core specific
+		sapAiCoreClientId: protoConfig.sapAiCoreClientId,
+		sapAiCoreClientSecret: protoConfig.sapAiCoreClientSecret,
+		sapAiCoreBaseUrl: protoConfig.sapAiCoreBaseUrl,
+		sapAiCoreTokenUrl: protoConfig.sapAiCoreTokenUrl,
+		sapAiResourceGroup: protoConfig.sapAiResourceGroup,
 
 		// Arrays
 		favoritedModelIds: protoConfig.favoritedModelIds || [],

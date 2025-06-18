@@ -50,10 +50,16 @@ export async function updateSettings(controller: Controller, request: UpdateSett
 			await controller.context.globalState.update("mcpResponsesCollapsed", request.mcpResponsesCollapsed)
 		}
 
+		// Update MCP responses collapsed setting
+		if (request.mcpRichDisplayEnabled !== undefined) {
+			await controller.context.globalState.update("mcpRichDisplayEnabled", request.mcpRichDisplayEnabled)
+		}
+
 		// Update chat settings
 		if (request.chatSettings) {
 			const chatSettings = convertProtoChatSettingsToChatSettings(request.chatSettings)
 			await controller.context.globalState.update("chatSettings", chatSettings)
+			await controller.context.workspaceState.update("chatSettings", chatSettings)
 			if (controller.task) {
 				controller.task.chatSettings = chatSettings
 			}
@@ -69,18 +75,9 @@ export async function updateSettings(controller: Controller, request: UpdateSett
 			await controller.context.globalState.update("terminalReuseEnabled", request.terminalReuseEnabled)
 		}
 
-		// Update HTTP proxy setting
-		if (request.httpProxy !== undefined) {
-			// Check if httpProxy is present in the request
-			await controller.context.globalState.update("httpProxy", request.httpProxy)
-			// The applyHttpProxy method is on the controller instance, not context.
-			// Assuming controller has an applyHttpProxy method as per the dev note.
-			if (typeof (controller as any).applyHttpProxy === "function") {
-				await (controller as any).applyHttpProxy(request.httpProxy)
-			} else {
-				// Fallback or log error if method doesn't exist, though it should based on controller/index.ts
-				console.error("Controller.applyHttpProxy method not found. HTTP Proxy may not be applied immediately.")
-			}
+		// Update terminal output line limit
+		if (request.terminalOutputLineLimit !== undefined) {
+			await controller.context.globalState.update("terminalOutputLineLimit", Number(request.terminalOutputLineLimit))
 		}
 
 		// Post updated state to webview

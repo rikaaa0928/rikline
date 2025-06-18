@@ -234,6 +234,8 @@ function convertApiProviderToProto(provider: string | undefined): ProtoApiProvid
 			return ProtoApiProvider.SAMBANOVA
 		case "cerebras":
 			return ProtoApiProvider.CEREBRAS
+		case "sapaicore":
+			return ProtoApiProvider.SAPAICORE
 		case "mify":
 			return ProtoApiProvider.MIFY
 		default:
@@ -292,6 +294,8 @@ function convertProtoToApiProvider(provider: ProtoApiProvider): ApiProvider {
 			return "sambanova"
 		case ProtoApiProvider.CEREBRAS:
 			return "cerebras"
+		case ProtoApiProvider.SAPAICORE:
+			return "sapaicore"
 		case ProtoApiProvider.MIFY:
 			return "mify"
 		default:
@@ -371,6 +375,13 @@ export function convertApiConfigurationToProto(config: ApiConfiguration): ProtoA
 		requestTimeoutMs: config.requestTimeoutMs,
 		apiProvider: config.apiProvider ? convertApiProviderToProto(config.apiProvider) : undefined,
 		favoritedModelIds: config.favoritedModelIds || [],
+		sapAiCoreClientId: config.sapAiCoreClientId,
+		sapAiCoreClientSecret: config.sapAiCoreClientSecret,
+		sapAiResourceGroup: config.sapAiResourceGroup,
+		sapAiCoreTokenUrl: config.sapAiCoreTokenUrl,
+		sapAiCoreBaseUrl: config.sapAiCoreBaseUrl,
+		openRouterBaseUrl: config.openRouterBaseUrl,
+		xaiBaseUrl: config.xaiBaseUrl,
 		mifyApiKey: config.mifyApiKey,
 		mifyBaseUrl: config.mifyBaseUrl,
 		mifyModelId: config.mifyModelId,
@@ -450,6 +461,13 @@ export function convertProtoToApiConfiguration(protoConfig: ProtoApiConfiguratio
 		requestTimeoutMs: protoConfig.requestTimeoutMs,
 		apiProvider: protoConfig.apiProvider !== undefined ? convertProtoToApiProvider(protoConfig.apiProvider) : undefined,
 		favoritedModelIds: protoConfig.favoritedModelIds.length > 0 ? protoConfig.favoritedModelIds : undefined,
+		sapAiCoreClientId: protoConfig.sapAiCoreClientId,
+		sapAiCoreClientSecret: protoConfig.sapAiCoreClientSecret,
+		sapAiResourceGroup: protoConfig.sapAiResourceGroup,
+		sapAiCoreTokenUrl: protoConfig.sapAiCoreTokenUrl,
+		sapAiCoreBaseUrl: protoConfig.sapAiCoreBaseUrl,
+		openRouterBaseUrl: protoConfig.openRouterBaseUrl,
+		xaiBaseUrl: protoConfig.xaiBaseUrl,
 		mifyApiKey: protoConfig.mifyApiKey,
 		mifyBaseUrl: protoConfig.mifyBaseUrl,
 		mifyModelId: protoConfig.mifyModelId,
