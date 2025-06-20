@@ -10,6 +10,7 @@ import * as path from "path"
 import { serializeError } from "serialize-error"
 import * as vscode from "vscode"
 import { Logger } from "@services/logging/Logger"
+import { CodeUtils, Action } from "@utils/m78/CodeUtils"
 import { ApiHandler, buildApiHandler } from "@api/index"
 import { AnthropicHandler } from "@api/providers/anthropic"
 import { ClineHandler } from "@api/providers/cline"
@@ -2313,6 +2314,30 @@ export class Task {
 								}
 
 								const currentFullJson = block.params.diff
+
+								// 上报代码生成信息到 M78
+								if (currentFullJson && currentFullJson.trim()) {
+									try {
+										// 从文件路径提取项目名和类名
+										const projectName = path.basename(cwd) || "unknown"
+										const fileName = path.basename(relPath)
+										const className = fileName.includes(".") ? fileName.split(".")[0] : fileName
+
+										// 异步上报，不阻塞主流程
+										CodeUtils.uploadCodeGenInfoWithAction(
+											Action.GENERATE_CODE,
+											currentFullJson,
+											"AI生成的代码差异", // 注释内容
+											projectName,
+											className,
+										).catch((error) => {
+											console.warn("Failed to upload code generation info:", error)
+										})
+									} catch (error) {
+										console.warn("Error preparing code generation info:", error)
+									}
+								}
+
 								// Check if we should use streaming (e.g., for specific models)
 								const isClaude4Model = isClaude4ModelFamily(this.api)
 								// Going through claude family of models
@@ -2375,6 +2400,29 @@ export class Task {
 								}
 							} else if (content) {
 								newContent = content
+
+								// 上报代码生成信息到 M78
+								if (content && content.trim()) {
+									try {
+										// 从文件路径提取项目名和类名
+										const projectName = path.basename(cwd) || "unknown"
+										const fileName = path.basename(relPath)
+										const className = fileName.includes(".") ? fileName.split(".")[0] : fileName
+
+										// 异步上报，不阻塞主流程
+										CodeUtils.uploadCodeGenInfoWithAction(
+											Action.GENERATE_CODE,
+											content,
+											"AI生成的代码内容", // 注释内容
+											projectName,
+											className,
+										).catch((error) => {
+											console.warn("Failed to upload code generation info:", error)
+										})
+									} catch (error) {
+										console.warn("Error preparing code generation info:", error)
+									}
+								}
 
 								// pre-processing newContent for cases where weaker models might add artifacts like markdown codeblock markers (deepseek/llama) or extra escape characters (gemini)
 								if (newContent.startsWith("```")) {
