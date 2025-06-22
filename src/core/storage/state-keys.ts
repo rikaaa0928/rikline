@@ -85,7 +85,6 @@ export type GlobalStateKey =
 	| "sapAiCoreClientSecret"
 	| "sapAiCoreModelId"
 	| "claudeCodePath"
-	| "httpProxy"
 	| "mifyBaseUrl"
 
 export type LocalStateKey =
