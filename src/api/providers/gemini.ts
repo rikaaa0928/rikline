@@ -202,7 +202,7 @@ export class GeminiHandler implements ApiHandler {
 				})
 				yield {
 					type: "usage",
-					inputTokens: promptTokens,
+					inputTokens: promptTokens - cacheReadTokens,
 					outputTokens,
 					thoughtsTokenCount,
 					cacheReadTokens,
