@@ -2,6 +2,7 @@ import type { LanguageModelChatSelector } from "../api/providers/types"
 
 export type ApiProvider =
 	| "anthropic"
+	| "claude-code"
 	| "openrouter"
 	| "bedrock"
 	| "vertex"
@@ -56,6 +57,7 @@ export interface ApiHandlerOptions {
 	awsBedrockEndpoint?: string
 	awsBedrockCustomSelected?: boolean
 	awsBedrockCustomModelBaseId?: BedrockModelId
+	claudeCodePath?: string
 	vertexProjectId?: string
 	vertexRegion?: string
 	vertexBaseUrl?: string // 添加 Vertex Base URL
@@ -232,6 +234,17 @@ export const anthropicModels = {
 		cacheReadsPrice: 0.03,
 	},
 } as const satisfies Record<string, ModelInfo> // as const assertion makes the object deeply readonly
+
+// Claude Code
+export type ClaudeCodeModelId = keyof typeof claudeCodeModels
+export const claudeCodeDefaultModelId: ClaudeCodeModelId = "claude-sonnet-4-20250514"
+export const claudeCodeModels = {
+	"claude-sonnet-4-20250514": anthropicModels["claude-sonnet-4-20250514"],
+	"claude-opus-4-20250514": anthropicModels["claude-opus-4-20250514"],
+	"claude-3-7-sonnet-20250219": anthropicModels["claude-3-7-sonnet-20250219"],
+	"claude-3-5-sonnet-20241022": anthropicModels["claude-3-5-sonnet-20241022"],
+	"claude-3-5-haiku-20241022": anthropicModels["claude-3-5-haiku-20241022"],
+} as const satisfies Record<string, ModelInfo>
 
 // AWS Bedrock
 // https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html
@@ -567,7 +580,7 @@ export const vertexModels = {
 		inputPrice: 0,
 		outputPrice: 0,
 	},
-	"gemini-2.5-pro-preview-05-06": {
+	"gemini-2.5-pro": {
 		maxTokens: 65536,
 		contextWindow: 1_048_576,
 		supportsImages: true,
@@ -575,7 +588,7 @@ export const vertexModels = {
 		supportsGlobalEndpoint: true,
 		inputPrice: 2.5,
 		outputPrice: 15,
-		cacheReadsPrice: 0.31,
+		cacheReadsPrice: 0.625,
 		tiers: [
 			{
 				contextWindow: 200000,
@@ -591,54 +604,14 @@ export const vertexModels = {
 			},
 		],
 	},
-	"gemini-2.5-pro-preview-06-05": {
+	"gemini-2.5-flash": {
 		maxTokens: 65536,
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
 		supportsGlobalEndpoint: true,
-		inputPrice: 2.5,
-		outputPrice: 15,
-		cacheReadsPrice: 0.31,
-		tiers: [
-			{
-				contextWindow: 200000,
-				inputPrice: 1.25,
-				outputPrice: 10,
-				cacheReadsPrice: 0.31,
-			},
-			{
-				contextWindow: Infinity,
-				inputPrice: 2.5,
-				outputPrice: 15,
-				cacheReadsPrice: 0.625,
-			},
-		],
-		thinkingConfig: {
-			maxBudget: 32768,
-		},
-	},
-	"gemini-2.5-flash-preview-04-17": {
-		maxTokens: 65536,
-		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: true,
-		supportsGlobalEndpoint: true,
-		inputPrice: 0.15,
-		outputPrice: 0.6,
-		thinkingConfig: {
-			maxBudget: 24576,
-			outputPrice: 3.5,
-		},
-	},
-	"gemini-2.5-flash-preview-05-20": {
-		maxTokens: 65536,
-		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: true,
-		supportsGlobalEndpoint: true,
-		inputPrice: 0.15,
-		outputPrice: 0.6,
+		inputPrice: 0.3,
+		outputPrice: 2.5,
 		thinkingConfig: {
 			maxBudget: 24576,
 			outputPrice: 3.5,
@@ -739,14 +712,14 @@ export const openAiModelInfoSaneDefaults: OpenAiCompatibleModelInfo = {
 export type GeminiModelId = keyof typeof geminiModels
 export const geminiDefaultModelId: GeminiModelId = "gemini-2.0-flash-001"
 export const geminiModels = {
-	"gemini-2.5-pro-preview-05-06": {
+	"gemini-2.5-pro": {
 		maxTokens: 65536,
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
 		inputPrice: 2.5,
 		outputPrice: 15,
-		cacheReadsPrice: 0.31,
+		cacheReadsPrice: 0.625,
 		tiers: [
 			{
 				contextWindow: 200000,
@@ -762,52 +735,14 @@ export const geminiModels = {
 			},
 		],
 	},
-	"gemini-2.5-pro-preview-06-05": {
+	"gemini-2.5-flash": {
 		maxTokens: 65536,
 		contextWindow: 1_048_576,
 		supportsImages: true,
 		supportsPromptCache: true,
-		supportsGlobalEndpoint: true,
-		inputPrice: 2.5,
-		outputPrice: 15,
-		cacheReadsPrice: 0.31,
-		tiers: [
-			{
-				contextWindow: 200000,
-				inputPrice: 1.25,
-				outputPrice: 10,
-				cacheReadsPrice: 0.31,
-			},
-			{
-				contextWindow: Infinity,
-				inputPrice: 2.5,
-				outputPrice: 15,
-				cacheReadsPrice: 0.625,
-			},
-		],
-		thinkingConfig: {
-			maxBudget: 32768,
-		},
-	},
-	"gemini-2.5-flash-preview-05-20": {
-		maxTokens: 65536,
-		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: true,
-		inputPrice: 0.15,
-		outputPrice: 0.6,
-		thinkingConfig: {
-			maxBudget: 24576,
-			outputPrice: 3.5,
-		},
-	},
-	"gemini-2.5-flash-preview-04-17": {
-		maxTokens: 65536,
-		contextWindow: 1_048_576,
-		supportsImages: true,
-		supportsPromptCache: true,
-		inputPrice: 0.15,
-		outputPrice: 0.6,
+		inputPrice: 0.3,
+		outputPrice: 2.5,
+		cacheReadsPrice: 0.075,
 		thinkingConfig: {
 			maxBudget: 24576,
 			outputPrice: 3.5,

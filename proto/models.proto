@@ -122,7 +122,8 @@ enum ApiProvider {
   SAMBANOVA = 22;
   CEREBRAS = 23;
   SAPAICORE = 24;
-  MIFY = 25;
+  CLAUDE_CODE = 25;
+  MIFY = 26;
 }
 
 // Model info for OpenAI-compatible models
@@ -235,16 +236,17 @@ message ModelsApiConfiguration {
   optional string sap_ai_resource_group = 70;
   optional string sap_ai_core_token_url = 71;
   optional string sap_ai_core_base_url = 72;
+  optional string claude_code_path = 73;
 
    // rikline add on
-  optional string vertex_base_url = 73;
-  optional string vertex_credentials_path = 74;
-  optional string open_router_base_url = 75;
-  optional string xai_base_url = 76;
-  
+  optional string vertex_base_url = 74;
+  optional string vertex_credentials_path = 75;
+  optional string open_router_base_url = 76;
+  optional string xai_base_url = 77;
+
   // Mify provider fields
-	optional string mify_api_key = 77;
-	optional string mify_base_url = 78;
-	optional string mify_model_id = 79;
-	optional OpenAiCompatibleModelInfo mify_model_info = 80;
+	optional string mify_api_key = 78;
+	optional string mify_base_url = 79;
+	optional string mify_model_id = 80;
+	optional OpenAiCompatibleModelInfo mify_model_info = 81;
 }

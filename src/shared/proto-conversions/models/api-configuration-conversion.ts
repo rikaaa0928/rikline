@@ -236,6 +236,8 @@ function convertApiProviderToProto(provider: string | undefined): ProtoApiProvid
 			return ProtoApiProvider.CEREBRAS
 		case "sapaicore":
 			return ProtoApiProvider.SAPAICORE
+		case "claude-code":
+			return ProtoApiProvider.CLAUDE_CODE
 		case "mify":
 			return ProtoApiProvider.MIFY
 		default:
@@ -296,6 +298,8 @@ function convertProtoToApiProvider(provider: ProtoApiProvider): ApiProvider {
 			return "cerebras"
 		case ProtoApiProvider.SAPAICORE:
 			return "sapaicore"
+		case ProtoApiProvider.CLAUDE_CODE:
+			return "claude-code"
 		case ProtoApiProvider.MIFY:
 			return "mify"
 		default:
@@ -380,6 +384,7 @@ export function convertApiConfigurationToProto(config: ApiConfiguration): ProtoA
 		sapAiResourceGroup: config.sapAiResourceGroup,
 		sapAiCoreTokenUrl: config.sapAiCoreTokenUrl,
 		sapAiCoreBaseUrl: config.sapAiCoreBaseUrl,
+		claudeCodePath: config.claudeCodePath,
 		openRouterBaseUrl: config.openRouterBaseUrl,
 		xaiBaseUrl: config.xaiBaseUrl,
 		mifyApiKey: config.mifyApiKey,
@@ -466,6 +471,7 @@ export function convertProtoToApiConfiguration(protoConfig: ProtoApiConfiguratio
 		sapAiResourceGroup: protoConfig.sapAiResourceGroup,
 		sapAiCoreTokenUrl: protoConfig.sapAiCoreTokenUrl,
 		sapAiCoreBaseUrl: protoConfig.sapAiCoreBaseUrl,
+		claudeCodePath: protoConfig.claudeCodePath,
 		openRouterBaseUrl: protoConfig.openRouterBaseUrl,
 		xaiBaseUrl: protoConfig.xaiBaseUrl,
 		mifyApiKey: protoConfig.mifyApiKey,

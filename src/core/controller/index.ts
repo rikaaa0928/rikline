@@ -20,6 +20,7 @@ import { ChatSettings } from "@shared/ChatSettings"
 import { ExtensionMessage, ExtensionState, Platform } from "@shared/ExtensionMessage"
 import { HistoryItem } from "@shared/HistoryItem"
 import { McpMarketplaceCatalog } from "@shared/mcp"
+import { UserInfo } from "@shared/UserInfo"
 import { TelemetrySetting } from "@shared/TelemetrySetting"
 import { WebviewMessage } from "@shared/WebviewMessage"
 import { fileExistsAtPath } from "@utils/fs"
@@ -51,7 +52,7 @@ https://github.com/KumarVariable/vscode-extension-sidebar-html/blob/master/src/c
 */
 
 export class Controller {
-	readonly id: string = uuidv4()
+	readonly id: string
 	private postMessage: (message: ExtensionMessage) => Thenable<boolean> | undefined
 
 	private disposables: vscode.Disposable[] = []
@@ -65,7 +66,9 @@ export class Controller {
 		readonly context: vscode.ExtensionContext,
 		private readonly outputChannel: vscode.OutputChannel,
 		postMessage: (message: ExtensionMessage) => Thenable<boolean> | undefined,
+		id: string,
 	) {
+		this.id = id
 		this.outputChannel.appendLine("ClineProvider instantiated")
 		this.postMessage = postMessage
 
@@ -122,7 +125,7 @@ export class Controller {
 		}
 	}
 
-	async setUserInfo(info?: { displayName: string | null; email: string | null; photoURL: string | null }) {
+	async setUserInfo(info?: UserInfo) {
 		await updateGlobalState(this.context, "userInfo", info)
 	}
 
@@ -202,15 +205,6 @@ export class Controller {
 	 */
 	async handleWebviewMessage(message: WebviewMessage) {
 		switch (message.type) {
-			case "authStateChanged":
-				await this.setUserInfo(message.user || undefined)
-				await this.postStateToWebview()
-				break
-
-			case "fetchUserCreditsData": {
-				await this.fetchUserCreditsData()
-				break
-			}
 			case "fetchMcpMarketplace": {
 				await this.fetchMcpMarketplace(message.bool)
 				break
@@ -268,7 +262,7 @@ export class Controller {
 		telemetryService.updateTelemetryState(isOptedIn)
 	}
 
-	async togglePlanActModeWithChatSettings(chatSettings: ChatSettings, chatContent?: ChatContent) {
+	async togglePlanActModeWithChatSettings(chatSettings: ChatSettings, chatContent?: ChatContent): Promise<boolean> {
 		const didSwitchToActMode = chatSettings.mode === "act"
 
 		// Capture mode switch telemetry | Capture regardless of if we know the taskId
@@ -421,8 +415,8 @@ export class Controller {
 						await updateWorkspaceState(this.context, "lmStudioModelId", newModelId)
 						break
 					case "litellm":
-						await updateWorkspaceState(this.context, "previousModeModelId", apiConfiguration.liteLlmModelId)
-						await updateWorkspaceState(this.context, "previousModeModelInfo", apiConfiguration.liteLlmModelInfo)
+						await updateWorkspaceState(this.context, "liteLlmModelId", newModelId)
+						await updateWorkspaceState(this.context, "liteLlmModelInfo", newModelInfo)
 						break
 					case "requesty":
 						await updateWorkspaceState(this.context, "requestyModelId", newModelId)
@@ -445,8 +439,8 @@ export class Controller {
 
 		if (this.task) {
 			this.task.chatSettings = chatSettings
-			if (this.task.isAwaitingPlanResponse && didSwitchToActMode) {
-				this.task.didRespondToPlanAskBySwitchingMode = true
+			if (this.task.taskState.isAwaitingPlanResponse && didSwitchToActMode) {
+				this.task.taskState.didRespondToPlanAskBySwitchingMode = true
 				// Use chatContent if provided, otherwise use default message
 				await this.task.handleWebviewAskResponse(
 					"messageResponse",
@@ -454,10 +448,15 @@ export class Controller {
 					chatContent?.images || [],
 					chatContent?.files || [],
 				)
+
+				return true
 			} else {
 				this.cancelTask()
+				return false
 			}
 		}
+
+		return false
 	}
 
 	async cancelTask() {
@@ -471,9 +470,9 @@ export class Controller {
 			await pWaitFor(
 				() =>
 					this.task === undefined ||
-					this.task.isStreaming === false ||
-					this.task.didFinishAbortingStream ||
-					this.task.isWaitingForFirstChunk, // if only first chunk is processed, then there's no need to wait for graceful abort (closes edits, browser, etc)
+					this.task.taskState.isStreaming === false ||
+					this.task.taskState.didFinishAbortingStream ||
+					this.task.taskState.isWaitingForFirstChunk, // if only first chunk is processed, then there's no need to wait for graceful abort (closes edits, browser, etc)
 				{
 					timeout: 3_000,
 				},
@@ -482,24 +481,10 @@ export class Controller {
 			})
 			if (this.task) {
 				// 'abandoned' will prevent this cline instance from affecting future cline instance gui. this may happen if its hanging on a streaming request
-				this.task.abandoned = true
+				this.task.taskState.abandoned = true
 			}
 			await this.initTask(undefined, undefined, undefined, historyItem) // clears task again, so we need to abortTask manually above
 			// await this.postStateToWebview() // new Cline instance will post state when it's ready. having this here sent an empty messages array to webview leading to virtuoso having to reload the entire list
-		}
-	}
-
-	// Account
-
-	async fetchUserCreditsData() {
-		try {
-			await Promise.all([
-				this.accountService?.fetchBalance(),
-				this.accountService?.fetchUsageTransactions(),
-				this.accountService?.fetchPaymentTransactions(),
-			])
-		} catch (error) {
-			console.error("Failed to fetch user credits data:", error)
 		}
 	}
 
@@ -1006,8 +991,8 @@ export class Controller {
 			apiConfiguration,
 			uriScheme: vscode.env.uriScheme,
 			currentTaskItem: this.task?.taskId ? (taskHistory || []).find((item) => item.id === this.task?.taskId) : undefined,
-			checkpointTrackerErrorMessage: this.task?.checkpointTrackerErrorMessage,
-			clineMessages: this.task?.clineMessages || [],
+			checkpointTrackerErrorMessage: this.task?.taskState.checkpointTrackerErrorMessage,
+			clineMessages: this.task?.messageStateHandler.getClineMessages() || [],
 			taskHistory: (taskHistory || [])
 				.filter((item) => item.ts && item.task)
 				.sort((a, b) => b.ts - a.ts)

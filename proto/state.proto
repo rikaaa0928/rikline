@@ -14,7 +14,7 @@ service StateService {
   rpc subscribeToState(EmptyRequest) returns (stream State);
   rpc toggleFavoriteModel(StringRequest) returns (Empty);
   rpc resetState(ResetStateRequest) returns (Empty);
-  rpc togglePlanActMode(TogglePlanActModeRequest) returns (Empty);
+  rpc togglePlanActMode(TogglePlanActModeRequest) returns (Boolean);
   rpc updateAutoApprovalSettings(AutoApprovalSettingsRequest) returns (Empty);
   rpc updateSettings(UpdateSettingsRequest) returns (Empty);
 }
@@ -218,15 +218,18 @@ message ApiConfiguration {
   optional string sap_ai_core_token_url = 75;
   optional string sap_ai_resource_group = 76;
 
+  // Claude Code specific
+  optional string claude_code_path = 77;
+
   // rikline add on
-  optional string vertex_base_url = 77;
-  optional string vertex_credentials_path = 78;
-  optional string open_router_base_url = 79;
-  optional string xai_base_url = 80;
+  optional string vertex_base_url = 78;
+  optional string vertex_credentials_path = 79;
+  optional string open_router_base_url = 80;
+  optional string xai_base_url = 81;
 
 	// Mify provider fields
-	optional string mify_api_key = 81;
-	optional string mify_base_url = 82;
-	optional string mify_model_id = 83;
-	optional string mify_model_info = 84; // stored as JSON string
+	optional string mify_api_key = 82;
+	optional string mify_base_url = 83;
+	optional string mify_model_id = 84;
+	optional string mify_model_info = 85; // stored as JSON string
 }

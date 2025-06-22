@@ -250,6 +250,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		sapAiCoreTokenUrl,
 		sapAiResourceGroup,
 		sapAiCoreModelId,
+		claudeCodePath,
 	] = await Promise.all([
 		getGlobalState(context, "isNewUser") as Promise<boolean | undefined>,
 		getSecret(context, "apiKey") as Promise<string | undefined>,
@@ -326,6 +327,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 		getGlobalState(context, "sapAiCoreTokenUrl") as Promise<string | undefined>,
 		getGlobalState(context, "sapAiResourceGroup") as Promise<string | undefined>,
 		getGlobalState(context, "sapAiCoreModelId") as Promise<string | undefined>,
+		getGlobalState(context, "claudeCodePath") as Promise<string | undefined>,
 	])
 
 	const localClineRulesToggles = (await getWorkspaceState(context, "localClineRulesToggles")) as ClineRulesToggles
@@ -449,6 +451,7 @@ export async function getAllExtensionState(context: vscode.ExtensionContext) {
 			apiKey,
 			openRouterApiKey,
 			clineApiKey,
+			claudeCodePath,
 			awsAccessKey,
 			awsSecretKey,
 			awsSessionToken,
@@ -642,6 +645,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 		sapAiCoreTokenUrl,
 		sapAiResourceGroup,
 		sapAiCoreModelId,
+		claudeCodePath,
 		mifyApiKey,
 		mifyBaseUrl,
 		mifyModelId,
@@ -704,6 +708,7 @@ export async function updateApiConfiguration(context: vscode.ExtensionContext, a
 	await updateGlobalState(context, "sapAiCoreTokenUrl", sapAiCoreTokenUrl)
 	await updateGlobalState(context, "sapAiResourceGroup", sapAiResourceGroup)
 	await updateGlobalState(context, "sapAiCoreModelId", sapAiCoreModelId)
+	await updateGlobalState(context, "claudeCodePath", claudeCodePath)
 	await updateGlobalState(context, "xaiBaseUrl", xaiBaseUrl)
 	await updateGlobalState(context, "openRouterBaseUrl", openRouterBaseUrl)
 	await updateGlobalState(context, "mifyBaseUrl", mifyBaseUrl)
