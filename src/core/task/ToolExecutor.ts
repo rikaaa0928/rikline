@@ -138,6 +138,10 @@ export class ToolExecutor {
 		switch (block.name) {
 			case "execute_command":
 				return `[${block.name} for '${block.params.command}']`
+			case "new_terminal":
+				return `[${block.name} for '${block.params.command}'${
+					block.params.terminal_name ? ` in terminal '${block.params.terminal_name}'` : ""
+				}]`
 			case "read_file":
 				return `[${block.name} for '${block.params.path}']`
 			case "write_to_file":
@@ -1380,6 +1384,127 @@ export class ToolExecutor {
 					}
 				} catch (error) {
 					await this.handleError("executing command", error, block)
+					await this.saveCheckpoint()
+					break
+				}
+			}
+			case "new_terminal": {
+				let command: string | undefined = block.params.command
+				let terminalName: string | undefined = block.params.terminal_name
+				const requiresApprovalRaw: string | undefined = block.params.requires_approval
+				const requiresApprovalPerLLM = requiresApprovalRaw?.toLowerCase() === "true"
+
+				try {
+					if (block.partial) {
+						if (this.shouldAutoApproveTool(block.name)) {
+							// 部分流式处理时，等待完整参数
+						} else {
+							await this.ask("command", this.removeClosingTag(block, "command", command), block.partial).catch(
+								() => {},
+							)
+						}
+						break
+					} else {
+						if (!command) {
+							this.taskState.consecutiveMistakeCount++
+							this.pushToolResult(await this.sayAndCreateMissingParamError("new_terminal", "command"), block)
+							await this.saveCheckpoint()
+							break
+						}
+						if (!requiresApprovalRaw) {
+							this.taskState.consecutiveMistakeCount++
+							this.pushToolResult(
+								await this.sayAndCreateMissingParamError("new_terminal", "requires_approval"),
+								block,
+							)
+							await this.saveCheckpoint()
+							break
+						}
+						this.taskState.consecutiveMistakeCount = 0
+
+						// gemini models tend to use unescaped html entities in commands
+						if (this.api.getModel().id.includes("gemini")) {
+							command = fixModelHtmlEscaping(command)
+						}
+
+						const ignoredFileAttemptedToAccess = this.clineIgnoreController.validateCommand(command)
+						if (ignoredFileAttemptedToAccess) {
+							await this.say("clineignore_error", ignoredFileAttemptedToAccess)
+							this.pushToolResult(
+								formatResponse.toolError(formatResponse.clineIgnoreError(ignoredFileAttemptedToAccess)),
+								block,
+							)
+							await this.saveCheckpoint()
+							break
+						}
+
+						let didAutoApprove = false
+
+						// 检查自动批准设置
+						const autoApproveResult = this.shouldAutoApproveTool(block.name)
+						const [autoApproveSafe, autoApproveAll] = Array.isArray(autoApproveResult)
+							? autoApproveResult
+							: [autoApproveResult, false]
+
+						if (
+							(!requiresApprovalPerLLM && autoApproveSafe) ||
+							(requiresApprovalPerLLM && autoApproveSafe && autoApproveAll)
+						) {
+							this.removeLastPartialMessageIfExistsWithType("ask", "command")
+							await this.say(
+								"command",
+								`Creating new terminal and executing: ${command}${terminalName ? ` (${terminalName})` : ""}`,
+								undefined,
+								undefined,
+								false,
+							)
+							this.taskState.consecutiveAutoApprovedRequestsCount++
+							didAutoApprove = true
+						} else {
+							showNotificationForApprovalIfAutoApprovalEnabled(
+								`Cline wants to create a new terminal and execute: ${command}`,
+								this.autoApprovalSettings.enabled,
+								this.autoApprovalSettings.enableNotifications,
+							)
+							const didApprove = await this.askApproval(
+								"command",
+								block,
+								`Creating new terminal and executing: ${command}${terminalName ? ` (Terminal name: ${terminalName})` : ""}` +
+									`${this.shouldAutoApproveTool(block.name) && requiresApprovalPerLLM ? COMMAND_REQ_APP_STRING : ""}`,
+							)
+							if (!didApprove) {
+								await this.saveCheckpoint()
+								break
+							}
+						}
+
+						// 创建新终端并执行命令
+						try {
+							const terminal = vscode.window.createTerminal({
+								name: terminalName || `Cline Terminal ${Date.now()}`,
+								cwd: this.cwd,
+							})
+
+							// 显示终端
+							terminal.show()
+
+							// 发送命令到终端
+							terminal.sendText(command)
+
+							// 结果反馈
+							const result = `新终端已创建${terminalName ? ` (名称: ${terminalName})` : ""} 并执行命令: ${command}\n终端已在VS Code中打开，您可以看到实时输出。`
+
+							this.pushToolResult(result, block)
+						} catch (error) {
+							const errorMessage = `创建新终端时出错: ${error instanceof Error ? error.message : String(error)}`
+							this.pushToolResult(formatResponse.toolError(errorMessage), block)
+						}
+
+						await this.saveCheckpoint()
+						break
+					}
+				} catch (error) {
+					await this.handleError("creating new terminal", error, block)
 					await this.saveCheckpoint()
 					break
 				}

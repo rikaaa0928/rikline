@@ -663,7 +663,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			} else {
 				// Create a temporary controller just for this operation
 				const outputChannel = vscode.window.createOutputChannel("Cline Commit Generator")
-				const tempController = new Controller(context, outputChannel, () => Promise.resolve(true))
+				const tempController = new Controller(context, outputChannel, () => Promise.resolve(true), uuidv4())
 
 				await tempController.createConventionalCommitMessage()
 				outputChannel.dispose()

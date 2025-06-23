@@ -24,6 +24,7 @@ import { loadMcpDocumentationToolDefinition } from "@core/tools/loadMcpDocumenta
 import { attemptCompletionToolDefinition } from "@core/tools/attemptCompletionTool"
 import { browserActionToolDefinition } from "@core/tools/browserActionTool"
 import { newTaskToolDefinition } from "@core/tools/newTaskTool"
+import { newTerminalToolDefinition } from "@core/tools/newTerminalTool"
 import { editToolDefinition } from "@/core/tools/editTool"
 
 export const SYSTEM_PROMPT_CLAUDE4_EXPERIMENTAL = async (
@@ -35,6 +36,7 @@ export const SYSTEM_PROMPT_CLAUDE4_EXPERIMENTAL = async (
 	const bashTool = bashToolDefinition(cwd)
 	const readTool = readToolDefinition(cwd)
 	const writeTool = writeToolDefinition(cwd)
+	const newTerminalTool = newTerminalToolDefinition(cwd)
 	const listCodeDefinitionNamesTool = listCodeDefinitionNamesToolDefinition(cwd)
 	const loadMcpDocumentationTool = loadMcpDocumentationToolDefinition(
 		useMCPToolDefinition.name,
@@ -331,6 +333,7 @@ You accomplish a given task iteratively, breaking it down into clear steps and w
 		askQuestionToolDefinition,
 		planModeRespondToolDefinition,
 		bashTool,
+		newTerminalTool,
 		lsToolDefinition,
 		grepToolDefinition,
 		webFetchToolDefinition,

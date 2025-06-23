@@ -62,6 +62,19 @@ Usage:
 <requires_approval>true or false</requires_approval>
 </execute_command>
 
+## new_terminal
+Description: 在新终端中执行命令并显示结果。这个工具会创建一个新的VS Code终端实例，在其中执行指定的命令，并实时显示输出结果。适用于需要在独立终端环境中运行的长时间命令、服务启动、或需要与用户交互的命令。命令将在当前工作目录执行：${cwd.toPosix()}。与execute_command的区别：execute_command在后台执行命令并返回完整结果，new_terminal在新的可见终端中执行，允许实时查看输出和交互。
+Parameters:
+- command: (required) 要在新终端中执行的命令。命令应该适合当前操作系统，格式正确且不包含有害指令。
+- terminal_name: (optional) 新终端的名称。如果不提供，将使用默认名称。有助于在多个终端之间进行区分。
+- requires_approval: (required) 布尔值，指示在用户启用自动批准模式时，此命令是否需要明确的用户批准。对于可能有影响的操作（如安装/卸载包、删除/覆盖文件、系统配置更改、网络操作或任何可能产生意外副作用的命令）设置为'true'。对于安全操作（如读取文件/目录、运行开发服务器、构建项目和其他非破坏性操作）设置为'false'。
+Usage:
+<new_terminal>
+<command>Your command here</command>
+<terminal_name>Terminal name here (optional)</terminal_name>
+<requires_approval>true or false</requires_approval>
+</new_terminal>
+
 ## read_file
 Description: Request to read the contents of a file at the specified path. Use this when you need to examine the contents of an existing file you do not know the contents of, for example to analyze code, review text files, or extract information from configuration files. Automatically extracts raw text from PDF and DOCX files. May not be suitable for other types of binary files, as it returns the raw content as a string.
 Parameters:
