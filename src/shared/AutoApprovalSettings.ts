@@ -13,6 +13,7 @@ export interface AutoApprovalSettings {
 		executeAllCommands?: boolean // Execute all commands
 		useBrowser: boolean // Use browser
 		useMcp: boolean // Use MCP servers
+		enableCodeStats?: boolean // Enable code statistics collection and reporting
 	}
 	// Global settings
 	maxRequests: number // Maximum number of auto-approved requests
@@ -32,6 +33,7 @@ export const DEFAULT_AUTO_APPROVAL_SETTINGS: AutoApprovalSettings = {
 		executeAllCommands: false,
 		useBrowser: false,
 		useMcp: false,
+		enableCodeStats: true,
 	},
 	maxRequests: 20,
 	enableNotifications: false,

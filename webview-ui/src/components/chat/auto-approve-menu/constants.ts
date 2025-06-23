@@ -75,6 +75,13 @@ export const ACTION_METADATA: ActionMetadata[] = [
 		description: "Allows Cline to use configured MCP servers which may modify filesystem or interact with APIs.",
 		icon: "codicon-server",
 	},
+	{
+		id: "enableCodeStats",
+		label: "Enable code statistics",
+		shortName: "Code Stats",
+		description: "Allows Cline to collect and report code generation statistics to improve service quality.",
+		icon: "codicon-graph",
+	},
 ]
 
 export const NOTIFICATIONS_SETTING: ActionMetadata = {

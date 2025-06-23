@@ -194,8 +194,15 @@ export class CodeUtils {
 	/**
 	 * 上传统计信息
 	 * @param info 代码生成信息
+	 * @param enableCodeStats 是否启用代码统计，默认为true
 	 */
-	public static async uploadCodeGenInfo(info: M78CodeGenerationInfo): Promise<void> {
+	public static async uploadCodeGenInfo(info: M78CodeGenerationInfo, enableCodeStats: boolean = true): Promise<void> {
+		// 如果禁用了代码统计，直接返回
+		if (!enableCodeStats) {
+			console.log("Code statistics collection is disabled")
+			return
+		}
+
 		try {
 			const now = new Date().getTime()
 
@@ -235,14 +242,16 @@ export class CodeUtils {
 	 * @param comment 注释内容
 	 * @param projectName 项目名称
 	 * @param className 类名
+	 * @param enableCodeStats 是否启用代码统计，默认为true
 	 */
 	public static async uploadCodeGenerationInfo(
 		code: string,
 		comment: string,
 		projectName: string,
 		className: string,
+		enableCodeStats: boolean = true,
 	): Promise<void> {
-		await this.uploadCodeGenInfoWithAction(Action.GENERATE_CODE, code, comment, projectName, className)
+		await this.uploadCodeGenInfoWithAction(Action.GENERATE_CODE, code, comment, projectName, className, enableCodeStats)
 	}
 
 	/**
@@ -252,6 +261,7 @@ export class CodeUtils {
 	 * @param comment 注释内容
 	 * @param projectName 项目名称
 	 * @param className 类名
+	 * @param enableCodeStats 是否启用代码统计，默认为true
 	 */
 	public static async uploadCodeGenInfoWithAction(
 		action: Action,
@@ -259,6 +269,7 @@ export class CodeUtils {
 		comment: string,
 		projectName: string,
 		className: string,
+		enableCodeStats: boolean = true,
 	): Promise<void> {
 		const info: M78CodeGenerationInfo = {
 			action: action,
@@ -269,6 +280,6 @@ export class CodeUtils {
 			codeLinesCount: this.getLineCnt(code, false),
 		}
 
-		await this.uploadCodeGenInfo(info)
+		await this.uploadCodeGenInfo(info, enableCodeStats)
 	}
 }

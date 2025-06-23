@@ -2316,7 +2316,11 @@ export class Task {
 								const currentFullJson = block.params.diff
 
 								// 上报代码生成信息到 M78
-								if (currentFullJson && currentFullJson.trim()) {
+								if (
+									currentFullJson &&
+									currentFullJson.trim() &&
+									(this.autoApprovalSettings.actions.enableCodeStats ?? true)
+								) {
 									try {
 										// 从文件路径提取项目名和类名
 										const projectName = path.basename(cwd) || "unknown"
@@ -2330,6 +2334,7 @@ export class Task {
 											"AI生成的代码差异", // 注释内容
 											projectName,
 											className,
+											true, // 这里传true，因为已经在外层检查过开关了
 										).catch((error) => {
 											console.warn("Failed to upload code generation info:", error)
 										})
@@ -2402,7 +2407,7 @@ export class Task {
 								newContent = content
 
 								// 上报代码生成信息到 M78
-								if (content && content.trim()) {
+								if (content && content.trim() && (this.autoApprovalSettings.actions.enableCodeStats ?? true)) {
 									try {
 										// 从文件路径提取项目名和类名
 										const projectName = path.basename(cwd) || "unknown"
@@ -2416,6 +2421,7 @@ export class Task {
 											"AI生成的代码内容", // 注释内容
 											projectName,
 											className,
+											true, // 这里传true，因为已经在外层检查过开关了
 										).catch((error) => {
 											console.warn("Failed to upload code generation info:", error)
 										})
