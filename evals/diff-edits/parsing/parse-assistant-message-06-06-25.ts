@@ -8,6 +8,7 @@ export interface TextContent {
 
 export const toolUseNames = [
 	"execute_command",
+	"new_terminal",
 	"read_file",
 	"write_to_file",
 	"replace_in_file",

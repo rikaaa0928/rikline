@@ -1096,8 +1096,7 @@ export class Controller {
 
 	// secrets
 
-	// Git commit message generation
-
+	// Git commit message generation (without GitSettings dependency)
 	async generateGitCommitMessage() {
 		try {
 			// Check if there's a workspace folder open
@@ -1114,27 +1113,90 @@ export class Controller {
 				return
 			}
 
-			// Show a progress notification
+			// First, try to generate a conventional commit message using local analysis
+			const { generateConventionalCommitMessage, showCommitMessageOptions } = await import(
+				"@integrations/git/commit-message-generator"
+			)
+			const { message: suggestedMessage, analysis } = generateConventionalCommitMessage(gitDiff, false) // Use default emoji setting (false)
+
+			// Ask user for preference
+			const userChoice = await vscode.window.showQuickPick(
+				[
+					{
+						label: "$(robot) Use AI Enhancement",
+						description: "Let AI improve the commit message with analysis",
+						detail: `Suggested: ${suggestedMessage}`,
+						picked: true,
+					},
+					{
+						label: "$(check) Use Suggested Message",
+						description: "Use the AI-analyzed conventional commit message directly",
+						detail: `Type: ${analysis.type}, Confidence: ${(analysis.confidence * 100).toFixed(0)}%`,
+					},
+				],
+				{
+					placeHolder: "Choose how to generate your commit message",
+					title: "Conventional Commit Message Generator",
+				},
+			)
+
+			if (!userChoice) {
+				return // User cancelled
+			}
+
+			const useAIEnhancement = userChoice.label.includes("Use AI Enhancement")
+
+			if (!useAIEnhancement) {
+				// Use the suggested message directly
+				await showCommitMessageOptions(suggestedMessage, analysis)
+				return
+			}
+
+			// Show a progress notification for AI enhancement
 			await vscode.window.withProgress(
 				{
 					location: vscode.ProgressLocation.Notification,
-					title: "Generating commit message...",
+					title: "Enhancing commit message with AI...",
 					cancellable: false,
 				},
 				async (progress, token) => {
 					try {
-						// Format the git diff into a prompt
-						const prompt = `Based on the following git diff, generate a concise and descriptive commit message:
+						// Format the git diff into a prompt (English only, no settings)
+						const prompt = `Based on the following git diff, generate a conventional commit message following the specification:
 
 ${gitDiff.length > 5000 ? gitDiff.substring(0, 5000) + "\n\n[Diff truncated due to size]" : gitDiff}
 
-The commit message should:
-1. Start with a short summary (50-72 characters)
-2. Use the imperative mood (e.g., "Add feature" not "Added feature")
-3. Describe what was changed and why
-4. Be clear and descriptive
+Follow the Conventional Commits specification to generate commit message:
 
-Commit message:`
+Format: <type>[optional scope]: <description>
+
+Available types:
+- feat: new feature
+- fix: bug fix
+- docs: documentation changes
+- style: code style changes
+- refactor: code refactoring
+- perf: performance improvements
+- test: test related changes
+- build: build related changes
+- ci: CI configuration changes
+- chore: other miscellaneous changes
+
+AI Analysis Suggestions:
+- Recommended type: ${analysis.type}
+- Recommended scope: ${analysis.scope || "none"}
+- Confidence: ${(analysis.confidence * 100).toFixed(0)}%
+- Analysis reason: ${analysis.reasoning}
+- Suggested message: ${suggestedMessage}
+
+Commit message requirements:
+1. Use English, concise and clear
+2. Use imperative mood for verbs (e.g. "add" not "added")
+3. Describe what was changed and why
+4. Keep title within 50-72 characters
+5. Add detailed body and footer if needed
+
+Please generate a compliant commit message:`
 
 						// Get the current API configuration
 						const { apiConfiguration } = await getAllExtensionState(this.context)
@@ -1143,8 +1205,18 @@ Commit message:`
 						const apiHandler = buildApiHandler(apiConfiguration)
 
 						// Create a system prompt
-						const systemPrompt =
-							"You are a helpful assistant that generates concise and descriptive git commit messages based on git diffs."
+						const systemPrompt = `You are a Git commit message expert specializing in Conventional Commits specification. 
+
+Your task is to generate high-quality conventional commit messages that:
+1. Follow the <type>[optional scope]: <description> format
+2. Use appropriate conventional commit types (feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert)
+3. Are concise but descriptive (50-72 characters for the title)
+4. Use imperative mood for the description
+5. Include scope when appropriate to clarify the affected component/module
+
+You should analyze the provided git diff and the AI analysis suggestions to create the most appropriate commit message. Prefer the AI-suggested type unless you have a strong reason to change it.
+
+Only return the commit message line, nothing else.`
 
 						// Create a message for the API
 						const messages = [
@@ -1166,36 +1238,40 @@ Commit message:`
 						}
 
 						// Extract the commit message
+						const { extractCommitMessage } = await import("@integrations/git/commit-message-generator")
 						const commitMessage = extractCommitMessage(response)
 
-						// Apply the commit message to the Git input box
+						// Show commit message with options
 						if (commitMessage) {
-							// Get the Git extension API
-							const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports
-							if (gitExtension) {
-								const api = gitExtension.getAPI(1)
-								if (api && api.repositories.length > 0) {
-									const repo = api.repositories[0]
-									repo.inputBox.value = commitMessage
-									vscode.window.showInformationMessage("Commit message generated and applied")
-								} else {
-									vscode.window.showErrorMessage("No Git repositories found")
-								}
-							} else {
-								vscode.window.showErrorMessage("Git extension not found")
-							}
+							await showCommitMessageOptions(commitMessage, analysis)
 						} else {
-							vscode.window.showErrorMessage("Failed to generate commit message")
+							// Fallback to suggested message if AI fails
+							vscode.window.showWarningMessage("AI enhancement failed, using suggested message")
+							await showCommitMessageOptions(suggestedMessage, analysis)
 						}
 					} catch (innerError) {
 						const innerErrorMessage = innerError instanceof Error ? innerError.message : String(innerError)
-						vscode.window.showErrorMessage(`Failed to generate commit message: ${innerErrorMessage}`)
+						vscode.window.showErrorMessage(`Failed to enhance commit message: ${innerErrorMessage}`)
+
+						// Fallback to suggested message
+						await showCommitMessageOptions(suggestedMessage, analysis)
 					}
 				},
 			)
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error)
 			vscode.window.showErrorMessage(`Failed to generate commit message: ${errorMessage}`)
+		}
+	}
+
+	// Manual conventional commit message creation
+	async createConventionalCommitMessage() {
+		try {
+			const { showConventionalCommitWizard } = await import("@integrations/git/commit-message-generator")
+			await showConventionalCommitWizard()
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error)
+			vscode.window.showErrorMessage(`Failed to create conventional commit message: ${errorMessage}`)
 		}
 	}
 

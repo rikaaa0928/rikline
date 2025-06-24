@@ -21,14 +21,97 @@ One of the most useful Git integrations is the ability to automatically generate
 3. Cline analyzes your changes and generates a descriptive commit message
 4. The message is automatically inserted into the commit message input box
 
+## Configuration
+
+Before using the git integration features, you can configure the behavior to match your preferences:
+
+### Git Settings
+
+Access the git settings through:
+
+-   **Command Palette**: `Cline: Configure Git Commit Settings`
+-   **Source Control panel**: Click the settings gear icon next to git commands
+
+Available settings:
+
+-   **Auto AI Enhancement**: Automatically use AI to enhance commit messages without prompting
+-   **Auto Accept High Confidence**: Automatically accept commit messages when confidence is above threshold
+-   **Confidence Threshold**: Set the minimum confidence level (0-100%) for auto-accepting messages
+-   **Show Analysis Details**: Display detailed analysis information in commit options
+-   **Include Emojis**: Add emoji prefixes to commit types (e.g., ✨ feat:, 🐛 fix:)
+-   **Preferred Language**: Choose between English and Chinese for AI prompts
+
+## Conventional Commits Support
+
+Cline now supports **Conventional Commits** specification, helping you create standardized, semantic commit messages that follow industry best practices.
+
+### Features:
+
+-   **Automatic Type Detection**: AI analyzes your changes to suggest the appropriate commit type (feat, fix, docs, etc.)
+-   **Smart Scope Extraction**: Automatically detects and suggests scopes based on modified files
+-   **Confidence Scoring**: Shows how confident the AI is about its analysis
+-   **Manual Creation Wizard**: Step-by-step guide to create conventional commits manually
+-   **Analysis Details**: View detailed reasoning behind AI suggestions
+
+### Two Ways to Create Conventional Commits:
+
+#### 1. AI-Enhanced Generation
+
+Use the existing "Generate Commit Message with Cline" command, which now:
+
+-   Analyzes your git diff using local pattern matching
+-   Suggests commit type, scope, and message
+-   Offers AI enhancement for better descriptions
+-   Shows analysis confidence and reasoning
+
+#### 2. Manual Creation Wizard
+
+Use the new "Create Conventional Commit Message" command for:
+
+-   Interactive step-by-step commit creation
+-   Type selection with descriptions and emojis
+-   Scope and description input with validation
+-   Optional body and footer sections
+-   Perfect for learning conventional commits
+
+### Conventional Commit Types Supported:
+
+-   **feat**: 新功能 (A new feature)
+-   **fix**: 修复 (A bug fix)
+-   **docs**: 文档 (Documentation only changes)
+-   **style**: 格式 (Changes that do not affect the meaning of the code)
+-   **refactor**: 重构 (A code change that neither fixes a bug nor adds a feature)
+-   **perf**: 性能 (A code change that improves performance)
+-   **test**: 测试 (Adding missing tests or correcting existing tests)
+-   **build**: 构建 (Changes that affect the build system or external dependencies)
+-   **ci**: CI (Changes to our CI configuration files and scripts)
+-   **chore**: 杂项 (Other changes that don't modify src or test files)
+-   **revert**: 回滚 (Reverts a previous commit)
+
+### Example Conventional Commit Messages:
+
+```
+feat(auth): add OAuth2 login support
+fix(api): resolve null pointer exception in user service
+docs: update installation guide with new requirements
+style: format code with prettier
+refactor(parser): extract validation logic to separate module
+perf(cache): implement lazy loading for heavy components
+test(auth): add unit tests for login validation
+build(deps): update React to version 18
+ci: add automated testing to GitHub Actions
+chore: update package.json version
+```
+
 The generated commit messages:
 
+-   Follow the `<type>[optional scope]: <description>` format
 -   Start with a concise summary (50-72 characters)
 -   Use imperative mood (e.g., "Add feature" not "Added feature")
 -   Describe what was changed and why
--   Follow Git best practices
+-   Follow Git and Conventional Commits best practices
 
-This feature saves time and ensures your commit history is consistent and informative.
+This feature saves time and ensures your commit history is consistent, semantic, and informative.
 
 <Tip>
 	For information about using `@git-changes` and `@[commit-hash]` mentions in your chat messages, see the [Git
@@ -40,13 +123,18 @@ This feature saves time and ensures your commit history is consistent and inform
 When you use Cline's commit message generation feature, here's what happens behind the scenes:
 
 1. Cline retrieves the current Git diff using `getWorkingState()`
-2. It formats this diff into a specialized prompt for the AI
-3. The AI analyzes the changes and generates an appropriate commit message
-4. The message is extracted and inserted into the Git commit message input box
+2. It analyzes the diff using pattern matching to determine commit type and scope
+3. You can choose between using the AI-suggested message or enhancing it with AI
+4. The AI analyzes the changes and generates an appropriate commit message
+5. The message is extracted and presented with analysis details
 
 This process uses your current Cline API configuration, so the quality of the generated messages matches your chosen AI model.
 
 ## Tips for Effective Use
+
+-   **Configure for your workflow**: Enable "Auto AI Enhancement" for faster commits, or keep it disabled for more control over the process.
+
+-   **Set appropriate confidence threshold**: If using auto-accept, set a threshold (e.g., 80%) that balances automation with quality control.
 
 -   **Generate commit messages for complex changes**: The AI excels at summarizing multiple related changes into a coherent message.
 
@@ -56,13 +144,18 @@ This process uses your current Cline API configuration, so the quality of the ge
 
 -   **Use for consistent commit history**: Using the generate commit message feature helps maintain a consistent style across your commit history.
 
+-   **Learn conventional commits**: Use the manual wizard to learn conventional commits patterns and improve your commit message skills.
+
+-   **Leverage automation for routine commits**: For simple changes like documentation updates or formatting fixes, auto-accept can save significant time.
+
 ## How It Works Under the Hood
 
 The commit message generation leverages VSCode's Git extension API to access repository information:
 
 1. When you trigger the command:
     - Cline gets the current diff
-    - It sends this to the AI with specific instructions for commit message formatting
+    - It analyzes file patterns, content changes, and code structure
+    - For AI enhancement, it sends this to the AI with specific instructions for commit message formatting
     - It parses the AI's response
     - It accesses the Git extension API to set the commit message
 

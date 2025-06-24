@@ -1575,6 +1575,7 @@ export class Task {
 						this.autoApprovalSettings.actions.editFilesExternally ?? false,
 					]
 				case "execute_command":
+				case "new_terminal":
 					return [
 						this.autoApprovalSettings.actions.executeSafeCommands ?? false,
 						this.autoApprovalSettings.actions.executeAllCommands ?? false,

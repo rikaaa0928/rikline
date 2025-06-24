@@ -11,6 +11,7 @@ import { ChatSettings } from "@shared/ChatSettings"
 import { TelemetrySetting } from "@shared/TelemetrySetting"
 import { UserInfo } from "@shared/UserInfo"
 import { ClineRulesToggles } from "@shared/cline-rules"
+
 import { ensureRulesDirectoryExists } from "./disk"
 import fs from "fs/promises"
 import path from "path"

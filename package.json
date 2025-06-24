@@ -187,6 +187,12 @@
 				"icon": "$(robot)"
 			},
 			{
+				"command": "cline.createConventionalCommitMessage",
+				"title": "Create Conventional Commit Message with Cline",
+				"category": "Cline",
+				"icon": "$(robot)"
+			},
+			{
 				"command": "cline.explainCode",
 				"title": "Explain with Cline",
 				"category": "Cline"
@@ -307,11 +313,20 @@
 					"command": "cline.generateGitCommitMessage",
 					"group": "navigation",
 					"when": "scmProvider == git"
+				},
+				{
+					"command": "cline.createConventionalCommitMessage",
+					"group": "navigation",
+					"when": "scmProvider == git"
 				}
 			],
 			"commandPalette": [
 				{
 					"command": "cline.generateGitCommitMessage",
+					"when": "scmProvider == git"
+				},
+				{
+					"command": "cline.createConventionalCommitMessage",
 					"when": "scmProvider == git"
 				}
 			]

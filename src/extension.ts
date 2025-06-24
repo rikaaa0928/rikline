@@ -651,6 +651,26 @@ export async function activate(context: vscode.ExtensionContext) {
 		}),
 	)
 
+	// Register the createConventionalCommitMessage command handler
+	context.subscriptions.push(
+		vscode.commands.registerCommand("cline.createConventionalCommitMessage", async () => {
+			// Get the controller from any instance, without activating the view
+			const controller = WebviewProvider.getAllInstances()[0]?.controller
+
+			if (controller) {
+				// Call the controller method to create conventional commit message
+				await controller.createConventionalCommitMessage()
+			} else {
+				// Create a temporary controller just for this operation
+				const outputChannel = vscode.window.createOutputChannel("Cline Commit Generator")
+				const tempController = new Controller(context, outputChannel, () => Promise.resolve(true), uuidv4())
+
+				await tempController.createConventionalCommitMessage()
+				outputChannel.dispose()
+			}
+		}),
+	)
+
 	return createClineAPI(outputChannel, sidebarWebview.controller)
 }
 
