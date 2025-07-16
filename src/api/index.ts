@@ -55,6 +55,7 @@ function createHandlerForProvider(apiProvider: string | undefined, options: Omit
 				openRouterProviderSorting: options.openRouterProviderSorting,
 				reasoningEffort: options.reasoningEffort,
 				thinkingBudgetTokens: options.thinkingBudgetTokens,
+				openRouterBaseUrl: options.openRouterBaseUrl,
 			})
 		case "bedrock":
 			return new AwsBedrockHandler({
@@ -83,6 +84,8 @@ function createHandlerForProvider(apiProvider: string | undefined, options: Omit
 				geminiApiKey: options.geminiApiKey,
 				geminiBaseUrl: options.geminiBaseUrl,
 				taskId: options.taskId,
+				vertexBaseUrl: options.vertexBaseUrl,
+				vertexCredentialsPath: options.vertexCredentialsPath,
 			})
 		case "openai":
 			return new OpenAiHandler({
@@ -203,6 +206,7 @@ function createHandlerForProvider(apiProvider: string | undefined, options: Omit
 				xaiApiKey: options.xaiApiKey,
 				reasoningEffort: options.reasoningEffort,
 				apiModelId: options.apiModelId,
+				xaiBaseUrl: options.xaiBaseUrl,
 			})
 		case "sambanova":
 			return new SambanovaHandler({

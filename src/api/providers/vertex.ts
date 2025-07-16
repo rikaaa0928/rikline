@@ -1,225 +1,292 @@
 import { Anthropic } from "@anthropic-ai/sdk"
-import axios from "axios"
-import { setTimeout as setTimeoutPromise } from "node:timers/promises"
-import OpenAI from "openai"
-import { ApiHandler } from "../"
-import { ModelInfo, openRouterDefaultModelId, openRouterDefaultModelInfo } from "@shared/api"
+import { AnthropicVertex } from "@anthropic-ai/vertex-sdk"
 import { withRetry } from "../retry"
-import { createOpenRouterStream } from "../transform/openrouter-stream"
-import { ApiStream, ApiStreamUsageChunk } from "../transform/stream"
-import { OpenRouterErrorResponse } from "./types"
-import { shouldSkipReasoningForModel } from "@utils/model-utils"
+import { ApiHandler } from "../"
+import { ApiHandlerOptions, ModelInfo, vertexDefaultModelId, VertexModelId, vertexModels } from "@shared/api"
+import { ApiStream } from "@api/transform/stream"
+import { GeminiHandler } from "./gemini"
+import process from "node:process" // 导入 process
 
-interface OpenRouterHandlerOptions {
-	openRouterApiKey?: string
-	openRouterModelId?: string
-	openRouterModelInfo?: ModelInfo
-	openRouterProviderSorting?: string
-	reasoningEffort?: string
+interface VertexHandlerOptions {
+	vertexProjectId?: string
+	vertexRegion?: string
+	apiModelId?: string
 	thinkingBudgetTokens?: number
-	openRouterBaseUrl?: string
+	geminiApiKey?: string
+	geminiBaseUrl?: string
+	taskId?: string
+	vertexBaseUrl?: string
+	vertexCredentialsPath?: string
 }
 
-export class OpenRouterHandler implements ApiHandler {
-	private options: OpenRouterHandlerOptions
-	private client: OpenAI | undefined
-	lastGenerationId?: string
+export class VertexHandler implements ApiHandler {
+	private geminiHandler: GeminiHandler | undefined
+	private clientAnthropic: AnthropicVertex | undefined
+	private options: VertexHandlerOptions
 
-	constructor(options: OpenRouterHandlerOptions) {
+	constructor(options: VertexHandlerOptions) {
 		this.options = options
 	}
 
-	private ensureClient(): OpenAI {
-		if (!this.client) {
-			if (!this.options.openRouterApiKey) {
-				throw new Error("OpenRouter API key is required")
-			}
+	private ensureGeminiHandler(): GeminiHandler {
+		if (!this.geminiHandler) {
 			try {
-				this.client = new OpenAI({
-					baseURL: this.options.openRouterBaseUrl || "https://openrouter.ai/api/v1",
-					apiKey: this.options.openRouterApiKey,
-					defaultHeaders: {
-						"HTTP-Referer": "https://rikaaa0928.moe", // Optional, for including your app on openrouter.ai rankings.
-						"X-Title": "rikcline", // Optional. Shows in rankings on openrouter.ai.
-					},
+				// 如果提供了凭证路径，则设置环境变量
+				// 注意：这应该在客户端初始化之前完成
+				if (this.options.vertexCredentialsPath) {
+					process.env.GOOGLE_APPLICATION_CREDENTIALS = this.options.vertexCredentialsPath
+				}
+
+				// Create a GeminiHandler with isVertex flag for Gemini models
+				this.geminiHandler = new GeminiHandler({
+					...this.options,
+					isVertex: true,
 				})
 			} catch (error: any) {
-				throw new Error(`Error creating OpenRouter client: ${error.message}`)
+				throw new Error(`Error creating Vertex AI Gemini handler: ${error.message}`)
 			}
 		}
-		return this.client
+		return this.geminiHandler
+	}
+
+	private ensureAnthropicClient(): AnthropicVertex {
+		if (!this.clientAnthropic) {
+			if (!this.options.vertexProjectId) {
+				throw new Error("Vertex AI project ID is required")
+			}
+			if (!this.options.vertexRegion) {
+				throw new Error("Vertex AI region is required")
+			}
+			try {
+				// Initialize Anthropic client for Claude models
+				this.clientAnthropic = new AnthropicVertex({
+					projectId: this.options.vertexProjectId,
+					// https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude#regions
+					region: this.options.vertexRegion,
+					// If vertexBaseUrl exists, append /v1 if it doesn't end with /
+					baseURL: this.options.vertexBaseUrl
+						? this.options.vertexBaseUrl.endsWith("/")
+							? `${this.options.vertexBaseUrl}v1`
+							: `${this.options.vertexBaseUrl}/v1`
+						: undefined,
+				})
+			} catch (error: any) {
+				throw new Error(`Error creating Vertex AI Anthropic client: ${error.message}`)
+			}
+		}
+		return this.clientAnthropic
 	}
 
 	@withRetry()
 	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
-		const client = this.ensureClient()
-		this.lastGenerationId = undefined
+		const model = this.getModel()
+		const modelId = model.id
 
-		const stream = await createOpenRouterStream(
-			client,
-			systemPrompt,
-			messages,
-			this.getModel(),
-			this.options.reasoningEffort,
-			this.options.thinkingBudgetTokens,
-			this.options.openRouterProviderSorting,
-		)
+		// For Gemini models, use the GeminiHandler
+		if (!modelId.includes("claude")) {
+			const geminiHandler = this.ensureGeminiHandler()
+			yield* geminiHandler.createMessage(systemPrompt, messages)
+			return
+		}
 
-		let didOutputUsage: boolean = false
+		const clientAnthropic = this.ensureAnthropicClient()
+
+		// Claude implementation
+		let budget_tokens = this.options.thinkingBudgetTokens || 0
+		const reasoningOn =
+			(modelId.includes("3-7") || modelId.includes("sonnet-4") || modelId.includes("opus-4")) && budget_tokens !== 0
+				? true
+				: false
+		let stream
+
+		switch (modelId) {
+			case "claude-sonnet-4@20250514":
+			case "claude-opus-4@20250514":
+			case "claude-3-7-sonnet@20250219":
+			case "claude-3-5-sonnet-v2@20241022":
+			case "claude-3-5-sonnet@20240620":
+			case "claude-3-5-haiku@20241022":
+			case "claude-3-opus@20240229":
+			case "claude-3-haiku@20240307": {
+				// Find indices of user messages for cache control
+				const userMsgIndices = messages.reduce(
+					(acc, msg, index) => (msg.role === "user" ? [...acc, index] : acc),
+					[] as number[],
+				)
+				const lastUserMsgIndex = userMsgIndices[userMsgIndices.length - 1] ?? -1
+				const secondLastMsgUserIndex = userMsgIndices[userMsgIndices.length - 2] ?? -1
+				stream = await clientAnthropic.beta.messages.create(
+					{
+						model: modelId,
+						max_tokens: model.info.maxTokens || 8192,
+						thinking: reasoningOn ? { type: "enabled", budget_tokens: budget_tokens } : undefined,
+						temperature: reasoningOn ? undefined : 0,
+						system: [
+							{
+								text: systemPrompt,
+								type: "text",
+								cache_control: { type: "ephemeral" },
+							},
+						],
+						messages: messages.map((message, index) => {
+							if (index === lastUserMsgIndex || index === secondLastMsgUserIndex) {
+								return {
+									...message,
+									content:
+										typeof message.content === "string"
+											? [
+													{
+														type: "text",
+														text: message.content,
+														cache_control: {
+															type: "ephemeral",
+														},
+													},
+												]
+											: message.content.map((content, contentIndex) =>
+													contentIndex === message.content.length - 1
+														? {
+																...content,
+																cache_control: {
+																	type: "ephemeral",
+																},
+															}
+														: content,
+												),
+								}
+							}
+							return {
+								...message,
+								content:
+									typeof message.content === "string"
+										? [
+												{
+													type: "text",
+													text: message.content,
+												},
+											]
+										: message.content,
+							}
+						}),
+						stream: true,
+					},
+					{
+						headers: {},
+					},
+				)
+				break
+			}
+			default: {
+				stream = await clientAnthropic.beta.messages.create({
+					model: modelId,
+					max_tokens: model.info.maxTokens || 8192,
+					temperature: 0,
+					system: [
+						{
+							text: systemPrompt,
+							type: "text",
+						},
+					],
+					messages: messages.map((message) => ({
+						...message,
+						content:
+							typeof message.content === "string"
+								? [
+										{
+											type: "text",
+											text: message.content,
+										},
+									]
+								: message.content,
+					})),
+					stream: true,
+				})
+				break
+			}
+		}
 
 		for await (const chunk of stream) {
-			// openrouter returns an error object instead of the openai sdk throwing an error
-			// Check for error field directly on chunk
-			if ("error" in chunk) {
-				const error = chunk.error as OpenRouterErrorResponse["error"]
-				console.error(`OpenRouter API Error: ${error?.code} - ${error?.message}`)
-				// Include metadata in the error message if available
-				const metadataStr = error.metadata ? `\nMetadata: ${JSON.stringify(error.metadata, null, 2)}` : ""
-				throw new Error(`OpenRouter API Error ${error.code}: ${error.message}${metadataStr}`)
-			}
-
-			// Check for error in choices[0].finish_reason
-			// OpenRouter may return errors in a non-standard way within choices
-			const choice = chunk.choices?.[0]
-			// Use type assertion since OpenRouter uses non-standard "error" finish_reason
-			if ((choice?.finish_reason as string) === "error") {
-				// Use type assertion since OpenRouter adds non-standard error property
-				const choiceWithError = choice as any
-				if (choiceWithError.error) {
-					const error = choiceWithError.error
-					console.error(
-						`OpenRouter Mid-Stream Error: ${error?.code || "Unknown"} - ${error?.message || "Unknown error"}`,
-					)
-					// Format error details
-					const errorDetails = typeof error === "object" ? JSON.stringify(error, null, 2) : String(error)
-					throw new Error(`OpenRouter Mid-Stream Error: ${errorDetails}`)
-				} else {
-					// Fallback if error details are not available
-					throw new Error(
-						`OpenRouter Mid-Stream Error: Stream terminated with error status but no error details provided`,
-					)
-				}
-			}
-
-			if (!this.lastGenerationId && chunk.id) {
-				this.lastGenerationId = chunk.id
-			}
-
-			const delta = chunk.choices[0]?.delta
-			if (delta?.content) {
-				yield {
-					type: "text",
-					text: delta.content,
-				}
-			}
-
-			// Reasoning tokens are returned separately from the content
-			// Skip reasoning content for Grok 4 models since it only displays "thinking" without providing useful information
-			if ("reasoning" in delta && delta.reasoning && !shouldSkipReasoningForModel(this.options.openRouterModelId)) {
-				yield {
-					type: "reasoning",
-					// @ts-ignore-next-line
-					reasoning: delta.reasoning,
-				}
-			}
-
-			if (!didOutputUsage && chunk.usage) {
-				let modelId = this.options.openRouterModelId
-				if (modelId && modelId.includes("gemini")) {
+			switch (chunk?.type) {
+				case "message_start":
+					const usage = chunk.message.usage
 					yield {
 						type: "usage",
-						cacheWriteTokens: 0,
-						cacheReadTokens: chunk.usage.prompt_tokens_details?.cached_tokens || 0,
-						inputTokens: (chunk.usage.prompt_tokens || 0) - (chunk.usage.prompt_tokens_details?.cached_tokens || 0),
-						outputTokens: chunk.usage.completion_tokens || 0,
-						// @ts-ignore-next-line
-						totalCost: (chunk.usage.cost || 0) + (chunk.usage.cost_details?.upstream_inference_cost || 0),
+						inputTokens: usage.input_tokens || 0,
+						outputTokens: usage.output_tokens || 0,
+						cacheWriteTokens: usage.cache_creation_input_tokens || undefined,
+						cacheReadTokens: usage.cache_read_input_tokens || undefined,
 					}
-				} else {
+					break
+				case "message_delta":
 					yield {
 						type: "usage",
-						cacheWriteTokens: 0,
-						cacheReadTokens: chunk.usage.prompt_tokens_details?.cached_tokens || 0,
-						inputTokens: chunk.usage.prompt_tokens || 0,
-						outputTokens: chunk.usage.completion_tokens || 0,
-						// @ts-ignore-next-line
-						totalCost: (chunk.usage.cost || 0) + (chunk.usage.cost_details?.upstream_inference_cost || 0),
+						inputTokens: 0,
+						outputTokens: chunk.usage?.output_tokens || 0,
 					}
-				}
-				didOutputUsage = true
-			}
-		}
-
-		// Fallback to generation endpoint if usage chunk not returned
-		if (!didOutputUsage) {
-			const apiStreamUsage = await this.getApiStreamUsage()
-			if (apiStreamUsage) {
-				yield apiStreamUsage
+					break
+				case "message_stop":
+					break
+				case "content_block_start":
+					switch (chunk.content_block.type) {
+						case "thinking":
+							yield {
+								type: "reasoning",
+								reasoning: chunk.content_block.thinking || "",
+							}
+							break
+						case "redacted_thinking":
+							// Handle redacted thinking blocks - we still mark it as reasoning
+							// but note that the content is encrypted
+							yield {
+								type: "reasoning",
+								reasoning: "[Redacted thinking block]",
+							}
+							break
+						case "text":
+							if (chunk.index > 0) {
+								yield {
+									type: "text",
+									text: "\n",
+								}
+							}
+							yield {
+								type: "text",
+								text: chunk.content_block.text,
+							}
+							break
+					}
+					break
+				case "content_block_delta":
+					switch (chunk.delta.type) {
+						case "thinking_delta":
+							yield {
+								type: "reasoning",
+								reasoning: chunk.delta.thinking,
+							}
+							break
+						case "text_delta":
+							yield {
+								type: "text",
+								text: chunk.delta.text,
+							}
+							break
+					}
+					break
+				case "content_block_stop":
+					break
 			}
 		}
 	}
 
-	async getApiStreamUsage(): Promise<ApiStreamUsageChunk | undefined> {
-		if (this.lastGenerationId) {
-			await setTimeoutPromise(500) // FIXME: necessary delay to ensure generation endpoint is ready
-			try {
-				const generationIterator = this.fetchGenerationDetails(this.lastGenerationId)
-				const generation = (await generationIterator.next()).value
-				// console.log("OpenRouter generation details:", generation)
-				let modelId = this.options.openRouterModelId
-				if (modelId && modelId.includes("gemini")) {
-					return {
-						type: "usage",
-						cacheWriteTokens: 0,
-						cacheReadTokens: generation?.native_tokens_cached || 0,
-						// openrouter generation endpoint fails often
-						inputTokens: (generation?.native_tokens_prompt || 0) - (generation?.native_tokens_cached || 0),
-						outputTokens: generation?.native_tokens_completion || 0,
-						totalCost: generation?.total_cost || 0,
-					}
-				} else {
-					return {
-						type: "usage",
-						cacheWriteTokens: 0,
-						cacheReadTokens: generation?.native_tokens_cached || 0,
-						// openrouter generation endpoint fails often
-						inputTokens: generation?.native_tokens_prompt || 0,
-						outputTokens: generation?.native_tokens_completion || 0,
-						totalCost: generation?.total_cost || 0,
-					}
-				}
-			} catch (error) {
-				// ignore if fails
-				console.error("Error fetching OpenRouter generation details:", error)
-			}
+	getModel(): { id: VertexModelId; info: ModelInfo } {
+		const modelId = this.options.apiModelId
+		if (modelId && modelId in vertexModels) {
+			const id = modelId as VertexModelId
+			return { id, info: vertexModels[id] }
 		}
-		return undefined
-	}
-
-	@withRetry({ maxRetries: 4, baseDelay: 250, maxDelay: 1000, retryAllErrors: true })
-	async *fetchGenerationDetails(genId: string) {
-		// console.log("Fetching generation details for:", genId)
-		try {
-			const response = await axios.get(`https://openrouter.ai/api/v1/generation?id=${genId}`, {
-				headers: {
-					Authorization: `Bearer ${this.options.openRouterApiKey}`,
-				},
-				timeout: 15_000, // this request hangs sometimes
-			})
-			yield response.data?.data
-		} catch (error) {
-			// ignore if fails
-			console.error("Error fetching OpenRouter generation details:", error)
-			throw error
+		return {
+			id: vertexDefaultModelId,
+			info: vertexModels[vertexDefaultModelId],
 		}
-	}
-
-	getModel(): { id: string; info: ModelInfo } {
-		let modelId = this.options.openRouterModelId
-		const modelInfo = this.options.openRouterModelInfo
-		if (modelId && modelInfo) {
-			return { id: modelId, info: modelInfo }
-		}
-		return { id: openRouterDefaultModelId, info: openRouterDefaultModelInfo }
 	}
 }
