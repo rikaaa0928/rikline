@@ -5,42 +5,76 @@ import { ApiHandler } from "../"
 import { ApiHandlerOptions, ModelInfo, vertexDefaultModelId, VertexModelId, vertexModels } from "@shared/api"
 import { ApiStream } from "@api/transform/stream"
 import { GeminiHandler } from "./gemini"
-// import { VertexAI } from "@google-cloud/vertexai"
-// import { calculateApiCostOpenAI } from "@utils/cost"
 import process from "node:process" // 导入 process
 
+interface VertexHandlerOptions {
+	vertexProjectId?: string
+	vertexRegion?: string
+	apiModelId?: string
+	thinkingBudgetTokens?: number
+	geminiApiKey?: string
+	geminiBaseUrl?: string
+	taskId?: string
+	vertexBaseUrl?: string
+	vertexCredentialsPath?: string
+}
+
 export class VertexHandler implements ApiHandler {
-	private geminiHandler: GeminiHandler
-	private clientAnthropic: AnthropicVertex
-	private options: ApiHandlerOptions
+	private geminiHandler: GeminiHandler | undefined
+	private clientAnthropic: AnthropicVertex | undefined
+	private options: VertexHandlerOptions
 
-	constructor(options: ApiHandlerOptions) {
+	constructor(options: VertexHandlerOptions) {
 		this.options = options
+	}
 
-		// 如果提供了凭证路径，则设置环境变量
-		// 注意：这应该在客户端初始化之前完成
-		if (options.vertexCredentialsPath) {
-			process.env.GOOGLE_APPLICATION_CREDENTIALS = options.vertexCredentialsPath
+	private ensureGeminiHandler(): GeminiHandler {
+		if (!this.geminiHandler) {
+			try {
+				// 如果提供了凭证路径，则设置环境变量
+				// 注意：这应该在客户端初始化之前完成
+				if (this.options.vertexCredentialsPath) {
+					process.env.GOOGLE_APPLICATION_CREDENTIALS = this.options.vertexCredentialsPath
+				}
+
+				// Create a GeminiHandler with isVertex flag for Gemini models
+				this.geminiHandler = new GeminiHandler({
+					...this.options,
+					isVertex: true,
+				})
+			} catch (error: any) {
+				throw new Error(`Error creating Vertex AI Gemini handler: ${error.message}`)
+			}
 		}
+		return this.geminiHandler
+	}
 
-		// Create a GeminiHandler with isVertex flag for Gemini models
-		this.geminiHandler = new GeminiHandler({
-			...options,
-			isVertex: true,
-		})
-
-		// Initialize Anthropic client for Claude models
-		this.clientAnthropic = new AnthropicVertex({
-			projectId: this.options.vertexProjectId,
-			// https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude#regions
-			region: this.options.vertexRegion,
-			// If vertexBaseUrl exists, append /v1 if it doesn't end with /
-			baseURL: this.options.vertexBaseUrl
-				? this.options.vertexBaseUrl.endsWith("/")
-					? `${this.options.vertexBaseUrl}v1`
-					: `${this.options.vertexBaseUrl}/v1`
-				: undefined,
-		})
+	private ensureAnthropicClient(): AnthropicVertex {
+		if (!this.clientAnthropic) {
+			if (!this.options.vertexProjectId) {
+				throw new Error("Vertex AI project ID is required")
+			}
+			if (!this.options.vertexRegion) {
+				throw new Error("Vertex AI region is required")
+			}
+			try {
+				// Initialize Anthropic client for Claude models
+				this.clientAnthropic = new AnthropicVertex({
+					projectId: this.options.vertexProjectId,
+					// https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude#regions
+					region: this.options.vertexRegion,
+					// If vertexBaseUrl exists, append /v1 if it doesn't end with /
+					baseURL: this.options.vertexBaseUrl
+						? this.options.vertexBaseUrl.endsWith("/")
+							? `${this.options.vertexBaseUrl}v1`
+							: `${this.options.vertexBaseUrl}/v1`
+						: undefined,
+				})
+			} catch (error: any) {
+				throw new Error(`Error creating Vertex AI Anthropic client: ${error.message}`)
+			}
+		}
+		return this.clientAnthropic
 	}
 
 	@withRetry()
@@ -50,9 +84,12 @@ export class VertexHandler implements ApiHandler {
 
 		// For Gemini models, use the GeminiHandler
 		if (!modelId.includes("claude")) {
-			yield* this.geminiHandler.createMessage(systemPrompt, messages)
+			const geminiHandler = this.ensureGeminiHandler()
+			yield* geminiHandler.createMessage(systemPrompt, messages)
 			return
 		}
+
+		const clientAnthropic = this.ensureAnthropicClient()
 
 		// Claude implementation
 		let budget_tokens = this.options.thinkingBudgetTokens || 0
@@ -78,7 +115,7 @@ export class VertexHandler implements ApiHandler {
 				)
 				const lastUserMsgIndex = userMsgIndices[userMsgIndices.length - 1] ?? -1
 				const secondLastMsgUserIndex = userMsgIndices[userMsgIndices.length - 2] ?? -1
-				stream = await this.clientAnthropic.beta.messages.create(
+				stream = await clientAnthropic.beta.messages.create(
 					{
 						model: modelId,
 						max_tokens: model.info.maxTokens || 8192,
@@ -140,7 +177,7 @@ export class VertexHandler implements ApiHandler {
 				break
 			}
 			default: {
-				stream = await this.clientAnthropic.beta.messages.create({
+				stream = await clientAnthropic.beta.messages.create({
 					model: modelId,
 					max_tokens: model.info.maxTokens || 8192,
 					temperature: 0,
