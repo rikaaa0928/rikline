@@ -32,12 +32,12 @@ import {
 import { sendFocusChatInputEvent } from "./core/controller/ui/subscribeToFocusChatInput"
 import { FileContextTracker } from "./core/context/context-tracking/FileContextTracker"
 import * as hostProviders from "@hosts/host-providers"
-import { vscodeHostBridgeClient } from "@/hosts/vscode/client/host-grpc-client"
-import { VscodeWebviewProvider } from "./core/webview/VscodeWebviewProvider"
+import { vscodeHostBridgeClient } from "@/hosts/vscode/hostbridge/client/host-grpc-client"
+import { VscodeWebviewProvider } from "./hosts/vscode/VscodeWebviewProvider"
 import { ExtensionContext } from "vscode"
 import { AuthService } from "./services/auth/AuthService"
 import { writeTextToClipboard, readTextFromClipboard } from "@/utils/env"
-import { VscodeDiffViewProvider } from "./integrations/editor/VscodeDiffViewProvider"
+import { VscodeDiffViewProvider } from "./hosts/vscode/VscodeDiffViewProvider"
 import { getHostBridgeProvider } from "@hosts/host-providers"
 import { ShowMessageRequest, ShowMessageType } from "./shared/proto/host/window"
 /*
@@ -301,35 +301,12 @@ export async function activate(context: vscode.ExtensionContext) {
 				break
 			}
 			case "/auth": {
-				const authService = AuthService.getInstance()
 				console.log("Auth callback received:", uri.toString())
 
 				const token = query.get("idToken")
-				const state = query.get("state")
 				const provider = query.get("provider")
 
-				console.log("Auth callback received:", {
-					token: token,
-					state: state,
-					provider: provider,
-				})
-
-				// Ask user to confirm on state mismatch. This enables signins initiated from
-				// outside the extension (e.g. Cline web) to be handled correctly.
-				if (authService.authNonce !== state) {
-					const userConfirmation = (
-						await getHostBridgeProvider().windowClient.showMessage(
-							ShowMessageRequest.create({
-								type: ShowMessageType.ERROR,
-								message: "Invalid auth state",
-							}),
-						)
-					)?.selectedOption
-					if (userConfirmation === "Cancel") {
-						console.log("User declined to continue with auth callback due to state mismatch")
-						return
-					}
-				}
+				console.log("Auth callback received:", { provider })
 
 				if (token) {
 					await visibleWebview?.controller.handleAuthCallback(token, provider)
@@ -386,7 +363,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				languageId,
 				Array.isArray(diagnostics) ? diagnostics : undefined,
 			)
-			telemetryService.captureButtonClick("codeAction_addToChat", visibleWebview?.controller.task?.taskId, true)
+			telemetryService.captureButtonClick("codeAction_addToChat", visibleWebview?.controller.task?.taskId)
 		}),
 	)
 
@@ -563,7 +540,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			// Send to sidebar provider with diagnostics
 			const visibleWebview = WebviewProvider.getVisibleInstance()
 			await visibleWebview?.controller.fixWithCline(selectedText, filePath, languageId, diagnostics)
-			telemetryService.captureButtonClick("codeAction_fixWithCline", visibleWebview?.controller.task?.taskId, true)
+			telemetryService.captureButtonClick("codeAction_fixWithCline", visibleWebview?.controller.task?.taskId)
 		}),
 	)
 
@@ -590,7 +567,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			const fileMention = visibleWebview?.controller.getFileMentionFromPath(filePath) || filePath
 			const prompt = `Explain the following code from ${fileMention}:\n\`\`\`${editor.document.languageId}\n${selectedText}\n\`\`\``
 			await visibleWebview?.controller.initTask(prompt)
-			telemetryService.captureButtonClick("codeAction_explainCode", visibleWebview?.controller.task?.taskId, true)
+			telemetryService.captureButtonClick("codeAction_explainCode", visibleWebview?.controller.task?.taskId)
 		}),
 	)
 
@@ -617,7 +594,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			const fileMention = visibleWebview?.controller.getFileMentionFromPath(filePath) || filePath
 			const prompt = `Improve the following code from ${fileMention} (e.g., suggest refactorings, optimizations, or better practices):\n\`\`\`${editor.document.languageId}\n${selectedText}\n\`\`\``
 			await visibleWebview?.controller.initTask(prompt)
-			telemetryService.captureButtonClick("codeAction_improveCode", visibleWebview?.controller.task?.taskId, true)
+			telemetryService.captureButtonClick("codeAction_improveCode", visibleWebview?.controller.task?.taskId)
 		}),
 	)
 
@@ -681,7 +658,7 @@ export async function activate(context: vscode.ExtensionContext) {
 					}),
 				)
 			}
-			telemetryService.captureButtonClick("command_focusChatInput", activeWebviewProvider?.controller.task?.taskId, true)
+			telemetryService.captureButtonClick("command_focusChatInput", activeWebviewProvider?.controller.task?.taskId)
 		}),
 	)
 
@@ -689,7 +666,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand("cline.openWalkthrough", async () => {
 			await vscode.commands.executeCommand("workbench.action.openWalkthrough", "saoudrizwan.claude-dev#ClineWalkthrough")
-			telemetryService.captureButtonClick("command_openWalkthrough", undefined, true)
+			telemetryService.captureButtonClick("command_openWalkthrough")
 		}),
 	)
 
@@ -750,8 +727,6 @@ const DEV_WORKSPACE_FOLDER = process.env.DEV_WORKSPACE_FOLDER
 export async function deactivate() {
 	// Dispose all webview instances
 	await WebviewProvider.disposeAllInstances()
-
-	await telemetryService.sendCollectedEvents()
 
 	// Clean up test mode
 	cleanupTestMode()
