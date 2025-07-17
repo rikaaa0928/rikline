@@ -81,7 +81,7 @@ import { refreshWorkflowToggles } from "../context/instructions/user-instruction
 import { MessageStateHandler } from "./message-state"
 import { TaskState } from "./TaskState"
 import { ToolExecutor } from "./ToolExecutor"
-import { formatErrorWithStatusCode, updateApiReqMsg } from "./utils"
+import { extractErrorDetails, formatErrorWithStatusCode, updateApiReqMsg } from "./utils"
 import { createDiffViewProvider, getHostBridgeProvider } from "@/hosts/host-providers"
 
 export const USE_EXPERIMENTAL_CLAUDE4_FEATURES = false
@@ -316,7 +316,17 @@ export class Task {
 	 * Updates the auto approval settings for this task
 	 */
 	public updateAutoApprovalSettings(settings: AutoApprovalSettings): void {
+		// Check if maxRequests changed
+		const maxRequestsChanged = this.autoApprovalSettings.maxRequests !== settings.maxRequests
+
+		// Update the settings
+		this.autoApprovalSettings = settings
 		this.toolExecutor.updateAutoApprovalSettings(settings)
+
+		// Reset counter if max requests limit changed
+		if (maxRequestsChanged) {
+			this.taskState.consecutiveAutoApprovedRequestsCount = 0
+		}
 	}
 
 	async restoreCheckpoint(messageTs: number, restoreType: ClineCheckpointRestore, offset?: number) {
@@ -1575,8 +1585,9 @@ export class Task {
 
 		await this.migrateDisableBrowserToolSetting()
 		const disableBrowserTool = this.browserSettings.disableToolUse ?? false
+		const modelInfo = this.api.getModel()
 		// cline browser tool uses image recognition for navigation (requires model image support).
-		const modelSupportsBrowserUse = this.api.getModel().info.supportsImages ?? false
+		const modelSupportsBrowserUse = modelInfo.info.supportsImages ?? false
 
 		const supportsBrowserUse = modelSupportsBrowserUse && !disableBrowserTool // only enable browser use if the model supports it and the user hasn't disabled it
 
@@ -1660,6 +1671,17 @@ export class Task {
 			const isAnthropic = this.api instanceof AnthropicHandler
 			const isOpenRouterContextWindowError = checkIsOpenRouterContextWindowError(error) && isOpenRouter
 			const isAnthropicContextWindowError = checkIsAnthropicContextWindowError(error) && isAnthropic
+
+			const { statusCode, message, requestId } = extractErrorDetails(error)
+
+			// Capture provider failure telemetry
+			telemetryService.captureProviderApiError({
+				taskId: this.taskId,
+				model: modelInfo.id,
+				errorMessage: message,
+				errorStatus: statusCode,
+				requestId,
+			})
 
 			if (isAnthropic && isAnthropicContextWindowError && !this.taskState.didAutomaticallyRetryFailedApiRequest) {
 				this.taskState.conversationHistoryDeletedRange = this.contextManager.getNextTruncationRange(
@@ -2054,7 +2076,7 @@ export class Task {
 			content: userContent,
 		})
 
-		telemetryService.captureConversationTurnEvent(this.taskId, currentProviderId, this.api.getModel().id, "user", true)
+		telemetryService.captureConversationTurnEvent(this.taskId, currentProviderId, this.api.getModel().id, "user")
 
 		// since we sent off a placeholder api_req_started message to update the webview while waiting to actually start the API request (to load potential details for example), we need to update the text of that message
 		const lastApiReqIndex = findLastIndex(this.messageStateHandler.getClineMessages(), (m) => m.say === "api_req_started")
@@ -2124,7 +2146,6 @@ export class Task {
 					currentProviderId,
 					this.api.getModel().id,
 					"assistant",
-					true,
 					{
 						tokensIn: inputTokens,
 						tokensOut: outputTokens,
@@ -2304,7 +2325,6 @@ export class Task {
 					currentProviderId,
 					this.api.getModel().id,
 					"assistant",
-					true,
 					{
 						tokensIn: inputTokens,
 						tokensOut: outputTokens,

@@ -237,9 +237,13 @@ message ApiConfiguration {
   optional string aws_authentication = 78;
   optional string aws_bedrock_api_key = 79;
 
+  // Moonshot
+  optional string moonshot_api_key = 80;
+  optional string moonshot_api_line = 81;
+
   // rikline add on
-  optional string vertex_base_url = 80;
-  optional string vertex_credentials_path = 81;
-  optional string open_router_base_url = 82;
-  optional string xai_base_url = 83;
+  optional string vertex_base_url = 82;
+  optional string vertex_credentials_path = 83;
+  optional string open_router_base_url = 84;
+  optional string xai_base_url = 85;
 }

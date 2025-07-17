@@ -20,11 +20,13 @@ export type SecretKey =
 	| "authNonce"
 	| "asksageApiKey"
 	| "xaiApiKey"
+	| "moonshotApiKey"
 	| "nebiusApiKey"
 	| "sambanovaApiKey"
 	| "cerebrasApiKey"
 	| "sapAiCoreClientId"
 	| "sapAiCoreClientSecret"
+	| "groqApiKey"
 
 export type GlobalStateKey =
 	| "awsRegion"
@@ -64,6 +66,7 @@ export type GlobalStateKey =
 	| "fireworksModelMaxCompletionTokens"
 	| "fireworksModelMaxTokens"
 	| "qwenApiLine"
+	| "moonshotApiLine"
 	| "mcpMarketplaceCatalog"
 	| "telemetrySetting"
 	| "asksageApiUrl"
@@ -119,5 +122,7 @@ export type GlobalStateKey =
 	| "previousModeAwsBedrockCustomSelected"
 	| "previousModeAwsBedrockCustomModelBaseId"
 	| "previousModeSapAiCoreModelId"
+	| "groqModelId"
+	| "groqModelInfo"
 
 export type LocalStateKey = "localClineRulesToggles" | "localCursorRulesToggles" | "localWindsurfRulesToggles" | "workflowToggles"
