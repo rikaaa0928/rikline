@@ -1,11 +1,12 @@
 import { Controller } from ".."
-import { EmptyRequest } from "../../../shared/proto/common"
-import { OpenRouterCompatibleModelInfo, OpenRouterModelInfo } from "../../../shared/proto/models"
+import { EmptyRequest } from "@shared/proto/cline/common"
+import { OpenRouterCompatibleModelInfo, OpenRouterModelInfo } from "@shared/proto/cline/models"
 import axios from "axios"
 import path from "path"
 import fs from "fs/promises"
 import { fileExistsAtPath } from "@utils/fs"
 import { GlobalFileNames } from "@core/storage/disk"
+import { CLAUDE_SONNET_4_1M_TIERS } from "@/shared/api"
 
 /**
  * Refreshes the OpenRouter models and returns the updated model list
@@ -49,7 +50,12 @@ export async function refreshOpenRouterModels(
 
 				switch (rawModel.id) {
 					case "anthropic/claude-sonnet-4":
-					case "anthropic/claude-opus-4":
+						modelInfo.supportsPromptCache = true
+						modelInfo.cacheWritesPrice = 3.75
+						modelInfo.cacheReadsPrice = 0.3
+						modelInfo.contextWindow = 1_000_000 // limiting providers to those that support 1m context window
+						modelInfo.tiers = CLAUDE_SONNET_4_1M_TIERS
+						break
 					case "anthropic/claude-3-7-sonnet":
 					case "anthropic/claude-3-7-sonnet:beta":
 					case "anthropic/claude-3.7-sonnet":
@@ -61,6 +67,12 @@ export async function refreshOpenRouterModels(
 						modelInfo.supportsPromptCache = true
 						modelInfo.cacheWritesPrice = 3.75
 						modelInfo.cacheReadsPrice = 0.3
+						break
+					case "anthropic/claude-opus-4.1":
+					case "anthropic/claude-opus-4":
+						modelInfo.supportsPromptCache = true
+						modelInfo.cacheWritesPrice = 18.75
+						modelInfo.cacheReadsPrice = 1.5
 						break
 					case "anthropic/claude-3.5-sonnet-20240620":
 					case "anthropic/claude-3.5-sonnet-20240620:beta":
@@ -109,6 +121,12 @@ export async function refreshOpenRouterModels(
 						modelInfo.inputPrice = 1
 						modelInfo.outputPrice = 3
 						modelInfo.contextWindow = 131_000
+						break
+					case "openai/gpt-5":
+					case "openai/gpt-5-chat":
+					case "openai/gpt-5-mini":
+					case "openai/gpt-5-nano":
+						modelInfo.maxTokens = 8_192 // 128000 breaks context window truncation
 						break
 					default:
 						if (rawModel.id.startsWith("openai/")) {

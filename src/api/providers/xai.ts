@@ -15,6 +15,12 @@ interface XAIHandlerOptions {
 	xaiBaseUrl?: string
 }
 
+interface XAIHandlerOptions {
+	xaiApiKey?: string
+	reasoningEffort?: string
+	apiModelId?: string
+}
+
 export class XAIHandler implements ApiHandler {
 	private options: XAIHandlerOptions
 	private client: OpenAI | undefined

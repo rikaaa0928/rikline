@@ -1,16 +1,15 @@
-import { ApiConfiguration } from "@shared/api"
-import { VSCodeCheckbox, VSCodeDropdown, VSCodeOption, VSCodeLink } from "@vscode/webview-ui-toolkit/react"
+import { VSCodeCheckbox, VSCodeDropdown, VSCodeOption, VSCodeLink, VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import { DebouncedTextField } from "../common/DebouncedTextField"
 import { DropdownContainer } from "../common/ModelSelector"
 import { useState } from "react"
-import { getOpenRouterAuthUrl } from "../utils/providerUtils"
+import { AccountServiceClient } from "@/services/grpc-client"
+import { EmptyRequest } from "@shared/proto/cline/common"
 import { useOpenRouterKeyInfo } from "../../ui/hooks/useOpenRouterKeyInfo"
-import VSCodeButtonLink from "../../common/VSCodeButtonLink"
 import OpenRouterModelPicker, { OPENROUTER_MODEL_PICKER_Z_INDEX } from "../OpenRouterModelPicker"
 import { formatPrice } from "../utils/pricingUtils"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { useApiConfigurationHandlers } from "../utils/useApiConfigurationHandlers"
-
+import { Mode } from "@shared/storage/types"
 /**
  * Component to display OpenRouter balance information
  */
@@ -53,13 +52,13 @@ const OpenRouterBalanceDisplay = ({ apiKey }: { apiKey: string }) => {
 interface OpenRouterProviderProps {
 	showModelOptions: boolean
 	isPopup?: boolean
-	uriScheme?: string
+	currentMode: Mode
 }
 
 /**
  * The OpenRouter provider configuration component
  */
-export const OpenRouterProvider = ({ showModelOptions, isPopup, uriScheme }: OpenRouterProviderProps) => {
+export const OpenRouterProvider = ({ showModelOptions, isPopup, currentMode }: OpenRouterProviderProps) => {
 	const { apiConfiguration } = useExtensionState()
 	const { handleFieldChange } = useApiConfigurationHandlers()
 
@@ -82,12 +81,18 @@ export const OpenRouterProvider = ({ showModelOptions, isPopup, uriScheme }: Ope
 					</div>
 				</DebouncedTextField>
 				{!apiConfiguration?.openRouterApiKey && (
-					<VSCodeButtonLink
-						href={getOpenRouterAuthUrl(uriScheme)}
+					<VSCodeButton
+						onClick={async () => {
+							try {
+								await AccountServiceClient.openrouterAuthClicked(EmptyRequest.create())
+							} catch (error) {
+								console.error("Failed to open OpenRouter auth:", error)
+							}
+						}}
 						style={{ margin: "5px 0 0 0" }}
 						appearance="secondary">
 						Get OpenRouter API Key
-					</VSCodeButtonLink>
+					</VSCodeButton>
 				)}
 				<p
 					style={{
@@ -142,7 +147,7 @@ export const OpenRouterProvider = ({ showModelOptions, isPopup, uriScheme }: Ope
 						</div>
 					)}
 
-					<OpenRouterModelPicker isPopup={isPopup} />
+					<OpenRouterModelPicker isPopup={isPopup} currentMode={currentMode} />
 				</>
 			)}
 			<DebouncedTextField

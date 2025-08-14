@@ -1,8 +1,7 @@
 import { Controller } from ".."
-import { FileSearchRequest, FileSearchResults } from "@shared/proto/file"
+import { FileSearchRequest, FileSearchResults, FileSearchType } from "@shared/proto/cline/file"
 import { searchWorkspaceFiles } from "@services/search/file-search"
 import { getWorkspacePath } from "@utils/path"
-import { FileMethodHandler } from "./index"
 import { convertSearchResultsToProtoFileInfos } from "@shared/proto-conversions/file/search-result-conversion"
 
 /**
@@ -11,10 +10,7 @@ import { convertSearchResultsToProtoFileInfos } from "@shared/proto-conversions/
  * @param request The request containing search query and optionally a mentionsRequestId
  * @returns Results containing matching files/folders
  */
-export const searchFiles: FileMethodHandler = async (
-	_controller: Controller,
-	request: FileSearchRequest,
-): Promise<FileSearchResults> => {
+export async function searchFiles(_controller: Controller, request: FileSearchRequest): Promise<FileSearchResults> {
 	const workspacePath = await getWorkspacePath()
 
 	if (!workspacePath) {
@@ -27,11 +23,20 @@ export const searchFiles: FileMethodHandler = async (
 	}
 
 	try {
+		// Map enum to string for the search service
+		let selectedTypeString: "file" | "folder" | undefined = undefined
+		if (request.selectedType === FileSearchType.FILE) {
+			selectedTypeString = "file"
+		} else if (request.selectedType === FileSearchType.FOLDER) {
+			selectedTypeString = "folder"
+		}
+
 		// Call file search service with query from request
 		const searchResults = await searchWorkspaceFiles(
 			request.query || "",
 			workspacePath,
 			request.limit || 20, // Use default limit of 20 if not specified
+			selectedTypeString,
 		)
 
 		// Convert search results to proto FileInfo objects using the conversion function
