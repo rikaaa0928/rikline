@@ -26,6 +26,8 @@ export async function readStateFromDisk(context: ExtensionContext) {
 	const awsAuthentication = context.globalState.get("awsAuthentication") as string | undefined
 	const vertexProjectId = context.globalState.get("vertexProjectId") as string | undefined
 	const vertexRegion = context.globalState.get("vertexRegion") as string | undefined
+	const vertexBaseUrl = context.globalState.get("vertexBaseUrl") as string | undefined
+	const vertexCredentialsPath = context.globalState.get("vertexCredentialsPath") as string | undefined
 	const openAiBaseUrl = context.globalState.get("openAiBaseUrl") as string | undefined
 	const openAiHeaders = context.globalState.get("openAiHeaders") as Record<string, string> | undefined
 	const ollamaBaseUrl = context.globalState.get("ollamaBaseUrl") as string | undefined
@@ -67,6 +69,8 @@ export async function readStateFromDisk(context: ExtensionContext) {
 	const claudeCodePath = context.globalState.get("claudeCodePath") as string | undefined
 	const openaiReasoningEffort = context.globalState.get("openaiReasoningEffort") as OpenaiReasoningEffort | undefined
 	const preferredLanguage = context.globalState.get("preferredLanguage") as string | undefined
+	const openRouterBaseUrl = context.globalState.get("openRouterBaseUrl") as string | undefined
+	const xaiBaseUrl = context.globalState.get("xaiBaseUrl") as string | undefined
 
 	// Get all secret values
 	const [
@@ -260,6 +264,8 @@ export async function readStateFromDisk(context: ExtensionContext) {
 			awsAuthentication,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiApiKey,
 			openAiHeaders: openAiHeaders || {},
@@ -305,6 +311,8 @@ export async function readStateFromDisk(context: ExtensionContext) {
 			huaweiCloudMaasApiKey,
 			basetenApiKey,
 			ollamaApiKey,
+			openRouterBaseUrl,
+			xaiBaseUrl,
 			// Plan mode configurations
 			planModeApiProvider: planModeApiProvider || apiProvider,
 			planModeApiModelId,

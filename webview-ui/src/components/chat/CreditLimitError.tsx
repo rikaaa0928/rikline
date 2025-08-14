@@ -31,7 +31,7 @@ const CreditLimitError: React.FC<CreditLimitErrorProps> = ({
 		? "https://app.cline.bot/dashboard/account?tab=credits&redirect=true"
 		: "https://app.cline.bot/dashboard/organization?tab=credits&redirect=true"
 
-	const callbackUrl = `${uriScheme || "vscode"}://saoudrizwan.claude-dev`
+	const callbackUrl = `${uriScheme || "vscode"}://rikaaa0928.rikline`
 	const fullPurchaseUrl = new URL(buyCreditsUrl)
 	fullPurchaseUrl.searchParams.set("callback_url", callbackUrl)
 

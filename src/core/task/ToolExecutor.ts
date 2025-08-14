@@ -1881,7 +1881,7 @@ export class ToolExecutor {
 						// Derive system information values algorithmically
 						const operatingSystem = os.platform() + " " + os.release()
 						const clineVersion =
-							vscode.extensions.getExtension("saoudrizwan.claude-dev")?.packageJSON.version || "Unknown"
+							vscode.extensions.getExtension("rikaaa0928.rikline")?.packageJSON.version || "Unknown"
 						const systemInfo = `VSCode: ${vscode.version}, Node.js: ${process.version}, Architecture: ${os.arch()}`
 						const currentMode = this.mode
 						const apiConfig = this.cacheService.getApiConfiguration()

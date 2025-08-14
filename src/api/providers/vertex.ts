@@ -57,6 +57,11 @@ export class VertexHandler implements ApiHandler {
 			if (!this.options.vertexRegion) {
 				throw new Error("Vertex AI region is required")
 			}
+			// 如果提供了凭证路径，则设置环境变量
+			// 注意：这应该在客户端初始化之前完成
+			if (this.options.vertexCredentialsPath) {
+				process.env.GOOGLE_APPLICATION_CREDENTIALS = this.options.vertexCredentialsPath
+			}
 			try {
 				// Initialize Anthropic client for Claude models
 				this.clientAnthropic = new AnthropicVertex({

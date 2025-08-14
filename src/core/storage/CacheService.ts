@@ -201,6 +201,8 @@ export class CacheService {
 			awsAuthentication,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiApiKey,
 			openAiHeaders,
@@ -248,6 +250,8 @@ export class CacheService {
 			huggingFaceApiKey,
 			huaweiCloudMaasApiKey,
 			requestTimeoutMs,
+			openRouterBaseUrl,
+			xaiBaseUrl,
 			// Plan mode configurations
 			planModeApiProvider,
 			planModeApiModelId,
@@ -380,6 +384,8 @@ export class CacheService {
 			awsAuthentication,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiHeaders,
 			ollamaBaseUrl,
@@ -402,6 +408,8 @@ export class CacheService {
 			sapAiCoreTokenUrl,
 			sapAiResourceGroup,
 			claudeCodePath,
+			openRouterBaseUrl,
+			xaiBaseUrl,
 		})
 
 		// Batch update secrets
@@ -612,6 +620,8 @@ export class CacheService {
 			awsAuthentication,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiApiKey,
 			openAiHeaders,
@@ -659,6 +669,8 @@ export class CacheService {
 			huggingFaceApiKey,
 			huaweiCloudMaasApiKey,
 			requestTimeoutMs,
+			openRouterBaseUrl,
+			xaiBaseUrl,
 			// Plan mode configurations
 			planModeApiProvider,
 			planModeApiModelId,
@@ -817,6 +829,8 @@ export class CacheService {
 			awsAuthentication,
 			vertexProjectId,
 			vertexRegion,
+			vertexBaseUrl,
+			vertexCredentialsPath,
 			openAiBaseUrl,
 			openAiHeaders,
 			ollamaBaseUrl,
@@ -839,6 +853,8 @@ export class CacheService {
 			sapAiCoreTokenUrl,
 			sapAiResourceGroup,
 			claudeCodePath,
+			openRouterBaseUrl,
+			xaiBaseUrl,
 		}
 
 		// Populate global state cache directly
@@ -941,6 +957,8 @@ export class CacheService {
 			awsAuthentication: this.globalStateCache["awsAuthentication"],
 			vertexProjectId: this.globalStateCache["vertexProjectId"],
 			vertexRegion: this.globalStateCache["vertexRegion"],
+			vertexBaseUrl: this.globalStateCache["vertexBaseUrl"],
+			vertexCredentialsPath: this.globalStateCache["vertexCredentialsPath"],
 			openAiBaseUrl: this.globalStateCache["openAiBaseUrl"],
 			openAiHeaders: this.globalStateCache["openAiHeaders"] || {},
 			ollamaBaseUrl: this.globalStateCache["ollamaBaseUrl"],
@@ -963,6 +981,8 @@ export class CacheService {
 			sapAiCoreTokenUrl: this.globalStateCache["sapAiCoreTokenUrl"],
 			sapAiResourceGroup: this.globalStateCache["sapAiResourceGroup"],
 			claudeCodePath: this.globalStateCache["claudeCodePath"],
+			openRouterBaseUrl: this.globalStateCache["openRouterBaseUrl"],
+			xaiBaseUrl: this.globalStateCache["xaiBaseUrl"],
 
 			// Plan mode configurations
 			planModeApiProvider: this.globalStateCache["planModeApiProvider"],

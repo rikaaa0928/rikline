@@ -298,4 +298,10 @@ message ModelsApiConfiguration {
   optional OpenRouterModelInfo act_mode_baseten_model_info = 227;
 
   repeated string favorited_model_ids = 300;
+
+  // rikline add on
+  optional string vertex_base_url = 301;
+  optional string vertex_credentials_path = 302;
+  optional string open_router_base_url = 303;
+  optional string xai_base_url = 304;
 }

@@ -181,6 +181,8 @@ export interface GlobalState {
 	awsUseProfile: boolean | undefined
 	vertexProjectId: string | undefined
 	vertexRegion: string | undefined
+	vertexBaseUrl: string | undefined
+	vertexCredentialsPath: string | undefined
 	lastShownAnnouncementId: string | undefined
 	taskHistory: HistoryItem[]
 	openAiBaseUrl: string | undefined
@@ -229,6 +231,8 @@ export interface GlobalState {
 	mode: Mode
 	focusChainSettings: FocusChainSettings
 	focusChainFeatureFlagEnabled: boolean
+	openRouterBaseUrl: string | undefined
+	xaiBaseUrl: string | undefined
 	// Plan mode configurations
 	planModeApiProvider: ApiProvider
 	planModeApiModelId: string | undefined

@@ -243,6 +243,12 @@ message ApiConfiguration {
   optional string aws_bedrock_api_key = 302;
 
   optional string cline_account_id = 303;
+
+  // rikline add on
+  optional string vertex_base_url = 304;
+  optional string vertex_credentials_path = 305;
+  optional string open_router_base_url = 306;
+  optional string xai_base_url = 307;
 }
 
 message UpdateTerminalConnectionTimeoutRequest {
