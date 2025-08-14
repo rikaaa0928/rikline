@@ -1,13 +1,13 @@
 import HeroTooltip from "@/components/common/HeroTooltip"
 import Thumbnails from "@/components/common/Thumbnails"
-import { normalizeApiConfiguration } from "@/components/settings/utils/providerUtils"
+import { normalizeApiConfiguration, getModeSpecificFields } from "@/components/settings/utils/providerUtils"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { FileServiceClient, TaskServiceClient, UiServiceClient } from "@/services/grpc-client"
 import { formatLargeNumber, formatSize } from "@/utils/format"
 import { validateSlashCommand } from "@/utils/slash-commands"
 import { mentionRegexGlobal } from "@shared/context-mentions"
 import { ClineMessage } from "@shared/ExtensionMessage"
-import { StringArrayRequest, StringRequest } from "@shared/proto/common"
+import { StringArrayRequest, StringRequest } from "@shared/proto/cline/common"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import React, { memo, useEffect, useMemo, useRef, useState } from "react"
 import { useWindowSize } from "react-use"
@@ -15,8 +15,41 @@ import TaskTimeline from "./TaskTimeline"
 import DeleteTaskButton from "./buttons/DeleteTaskButton"
 import CopyTaskButton from "./buttons/CopyTaskButton"
 import OpenDiskTaskHistoryButton from "./buttons/OpenDiskTaskHistoryButton"
+import ChecklistRenderer from "@/components/common/ChecklistRenderer"
 
 const IS_DEV = process.env.IS_DEV
+
+// Utility function to parse checklist and extract current todo info
+const parseCurrentTodoInfo = (text: string) => {
+	if (!text) return null
+
+	const lines = text.split("\n")
+	const todoItems: { text: string; completed: boolean; index: number }[] = []
+
+	lines.forEach((line, index) => {
+		const trimmedLine = line.trim()
+		if (trimmedLine.startsWith("- [ ]") || trimmedLine.startsWith("- [x]") || trimmedLine.startsWith("- [X]")) {
+			const completed = trimmedLine.startsWith("- [x]") || trimmedLine.startsWith("- [X]")
+			const text = trimmedLine.substring(5).trim() // Remove "- [ ] " or "- [x] "
+			todoItems.push({ text, completed, index })
+		}
+	})
+
+	if (todoItems.length === 0) return null
+
+	const currentTodoIndex = todoItems.findIndex((item) => !item.completed)
+	const currentTodo = currentTodoIndex >= 0 ? todoItems[currentTodoIndex] : null
+	const completedCount = todoItems.filter((item) => item.completed).length
+	const totalCount = todoItems.length
+
+	return {
+		currentTodo,
+		currentIndex: currentTodoIndex >= 0 ? currentTodoIndex + 1 : totalCount, // 1-based index
+		completedCount,
+		totalCount,
+		hasItems: totalCount > 0,
+	}
+}
 
 interface TaskHeaderProps {
 	task: ClineMessage
@@ -27,6 +60,7 @@ interface TaskHeaderProps {
 	cacheReads?: number
 	totalCost: number
 	lastApiReqTotalTokens?: number
+	lastProgressMessageText?: string
 	onClose: () => void
 	onScrollToMessage?: (messageIndex: number) => void
 }
@@ -40,18 +74,20 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({
 	cacheReads,
 	totalCost,
 	lastApiReqTotalTokens,
+	lastProgressMessageText,
 	onClose,
 	onScrollToMessage,
 }) => {
-	const { apiConfiguration, currentTaskItem, checkpointTrackerErrorMessage, clineMessages, navigateToSettings } =
+	const { apiConfiguration, currentTaskItem, checkpointTrackerErrorMessage, clineMessages, navigateToSettings, mode } =
 		useExtensionState()
 	const [isTaskExpanded, setIsTaskExpanded] = useState(true)
 	const [isTextExpanded, setIsTextExpanded] = useState(false)
 	const [showSeeMore, setShowSeeMore] = useState(false)
+	const [isTodoExpanded, setIsTodoExpanded] = useState(false)
 	const textContainerRef = useRef<HTMLDivElement>(null)
 	const textRef = useRef<HTMLDivElement>(null)
 
-	const { selectedModelInfo } = useMemo(() => normalizeApiConfiguration(apiConfiguration), [apiConfiguration])
+	const { selectedModelInfo } = useMemo(() => normalizeApiConfiguration(apiConfiguration, mode), [apiConfiguration, mode])
 	const contextWindow = selectedModelInfo?.contextWindow
 
 	// Open task header when checkpoint tracker error message is set
@@ -130,19 +166,18 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({
 	}, [task.text, windowWidth, isTaskExpanded])
 
 	const isCostAvailable = useMemo(() => {
+		const modeFields = getModeSpecificFields(apiConfiguration, mode)
 		const openAiCompatHasPricing =
-			apiConfiguration?.apiProvider === "openai" &&
-			apiConfiguration?.openAiModelInfo?.inputPrice &&
-			apiConfiguration?.openAiModelInfo?.outputPrice
+			modeFields.apiProvider === "openai" &&
+			modeFields.openAiModelInfo?.inputPrice &&
+			modeFields.openAiModelInfo?.outputPrice
 		if (openAiCompatHasPricing) {
 			return true
 		}
 		return (
-			apiConfiguration?.apiProvider !== "vscode-lm" &&
-			apiConfiguration?.apiProvider !== "ollama" &&
-			apiConfiguration?.apiProvider !== "lmstudio"
+			modeFields.apiProvider !== "vscode-lm" && modeFields.apiProvider !== "ollama" && modeFields.apiProvider !== "lmstudio"
 		)
-	}, [apiConfiguration?.apiProvider, apiConfiguration?.openAiModelInfo])
+	}, [apiConfiguration, mode])
 
 	const shouldShowPromptCacheInfo = () => {
 		// Hybrid logic: Show cache info if we have actual cache data,
@@ -490,6 +525,210 @@ const TaskHeader: React.FC<TaskHeaderProps> = ({
 								<TaskTimeline messages={clineMessages} onBlockClick={onScrollToMessage} />
 								{ContextWindowComponent}
 							</div>
+
+							{/* Current Todo Item Display */}
+							{(() => {
+								const todoInfo = parseCurrentTodoInfo(lastProgressMessageText || "")
+
+								if (!todoInfo?.hasItems) return null
+
+								if (todoInfo.completedCount === todoInfo.totalCount) {
+									return (
+										<div
+											onClick={() => setIsTodoExpanded(!isTodoExpanded)}
+											style={{
+												marginTop: "6px",
+												padding: "8px 12px",
+												backgroundColor:
+													"color-mix(in srgb, var(--vscode-charts-green) 15%, transparent)",
+												borderRadius: "3px",
+												fontSize: "12px",
+												cursor: "pointer",
+												transition: "background-color 0.2s ease",
+												border: "1px solid color-mix(in srgb, var(--vscode-charts-green) 30%, transparent)",
+											}}
+											onMouseEnter={(e) => {
+												e.currentTarget.style.backgroundColor =
+													"color-mix(in srgb, var(--vscode-charts-green) 25%, transparent)"
+											}}
+											onMouseLeave={(e) => {
+												e.currentTarget.style.backgroundColor =
+													"color-mix(in srgb, var(--vscode-charts-green) 15%, transparent)"
+											}}>
+											<div
+												style={{
+													display: "flex",
+													alignItems: "center",
+													justifyContent: "space-between",
+													gap: "8px",
+												}}>
+												<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+													<span style={{ fontWeight: "bold", color: "var(--vscode-charts-green)" }}>
+														All {todoInfo.totalCount} steps completed!
+													</span>
+												</div>
+												<span
+													className={`codicon codicon-chevron-${isTodoExpanded ? "down" : "right"}`}
+													style={{ color: "var(--vscode-charts-green)" }}></span>
+											</div>
+											{isTodoExpanded && (
+												<div
+													style={{
+														marginTop: "2px",
+														fontSize: "11px",
+														color: "var(--vscode-descriptionForeground)",
+														lineHeight: "1.4",
+													}}>
+													<div style={{ marginBottom: "2px" }}>
+														New steps will be generated if you continue the task
+													</div>
+												</div>
+											)}
+										</div>
+									)
+								}
+
+								return (
+									<div
+										onClick={() => setIsTodoExpanded(!isTodoExpanded)}
+										onMouseEnter={(e) => {
+											e.currentTarget.style.backgroundColor =
+												"color-mix(in srgb, var(--vscode-badge-foreground) 20%, transparent)"
+										}}
+										onMouseLeave={(e) => {
+											e.currentTarget.style.backgroundColor =
+												"color-mix(in srgb, var(--vscode-badge-foreground) 10%, transparent)"
+										}}
+										style={{
+											marginTop: "6px",
+											padding: "6px 8px",
+											backgroundColor:
+												"color-mix(in srgb, var(--vscode-badge-foreground) 10%, transparent)",
+											borderRadius: "3px",
+											fontSize: "12px",
+											cursor: "pointer",
+											transition: "background-color 0.2s ease",
+											position: "relative",
+											overflow: "hidden",
+										}}>
+										{/* Progress Bar - Behind content when collapsed */}
+										{!isTodoExpanded && (
+											<div
+												style={{
+													position: "absolute",
+													top: 0,
+													left: 0,
+													height: "100%",
+													width: `${(todoInfo.completedCount / todoInfo.totalCount) * 100}%`,
+													backgroundColor: "var(--vscode-textLink-foreground)",
+													opacity: 0.15,
+													borderRadius: "3px",
+													transition: "width 0.3s ease",
+													pointerEvents: "none",
+												}}
+											/>
+										)}
+										<div
+											style={{
+												display: "flex",
+												alignItems: "center",
+												justifyContent: "space-between",
+												gap: "8px",
+												position: "relative",
+												zIndex: 1,
+											}}>
+											<div
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: "8px",
+													flex: 1,
+													minWidth: 0,
+												}}>
+												<span
+													style={{
+														backgroundColor:
+															"color-mix(in srgb, var(--vscode-badge-foreground) 20%, transparent)",
+														color: "var(--vscode-badge-foreground)",
+														padding: "1px 6px",
+														borderRadius: "10px",
+														fontSize: "11px",
+														fontWeight: "500",
+														flexShrink: 0,
+													}}>
+													{todoInfo.currentIndex}/{todoInfo.totalCount}
+												</span>
+												{!isTodoExpanded && todoInfo.currentTodo && (
+													<span
+														style={{
+															wordBreak: "break-word",
+															overflowWrap: "anywhere",
+															color: "var(--vscode-foreground)",
+															lineHeight: "1.3",
+															overflow: "hidden",
+															textOverflow: "ellipsis",
+															whiteSpace: "nowrap",
+														}}>
+														{todoInfo.currentTodo.text}
+													</span>
+												)}
+											</div>
+											<span
+												className={`codicon codicon-chevron-${isTodoExpanded ? "down" : "right"}`}
+												style={{ flexShrink: 0 }}></span>
+										</div>
+									</div>
+								)
+							})()}
+
+							{/* Expanded focus chain list */}
+							{isTodoExpanded && lastProgressMessageText && (
+								<div
+									style={{
+										marginTop: "6px",
+										padding: "8px",
+										backgroundColor: "color-mix(in srgb, var(--vscode-badge-foreground) 5%, transparent)",
+										borderRadius: "3px",
+										position: "relative",
+									}}>
+									<ChecklistRenderer text={lastProgressMessageText} />
+									{/* Edit button for focus chain list */}
+									{parseCurrentTodoInfo(lastProgressMessageText)?.hasItems && (
+										<VSCodeButton
+											appearance="icon"
+											onClick={async () => {
+												try {
+													await FileServiceClient.openFocusChainFile(
+														StringRequest.create({ value: currentTaskItem?.id || "" }),
+													)
+												} catch (error) {
+													console.error("Error opening todo file:", error)
+												}
+											}}
+											style={{
+												position: "absolute",
+												top: "4px",
+												right: "4px",
+												width: "20px",
+												height: "20px",
+												minWidth: "20px",
+												padding: "0",
+												backgroundColor:
+													"color-mix(in srgb, var(--vscode-badge-foreground) 10%, transparent)",
+												border: "1px solid color-mix(in srgb, var(--vscode-badge-foreground) 20%, transparent)",
+											}}
+											title="Edit focus chain list in markdown file">
+											<span
+												className="codicon codicon-edit"
+												style={{
+													fontSize: "12px",
+													color: "var(--vscode-badge-foreground)",
+												}}></span>
+										</VSCodeButton>
+									)}
+								</div>
+							)}
+
 							{checkpointTrackerErrorMessage && (
 								<div
 									style={{

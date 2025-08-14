@@ -24,6 +24,7 @@ export async function createOpenRouterStream(
 	// handles direct model.id match logic
 	switch (model.id) {
 		case "anthropic/claude-sonnet-4":
+		case "anthropic/claude-opus-4.1":
 		case "anthropic/claude-opus-4":
 		case "anthropic/claude-3.7-sonnet":
 		case "anthropic/claude-3.7-sonnet:beta":
@@ -82,6 +83,7 @@ export async function createOpenRouterStream(
 	let maxTokens: number | undefined
 	switch (model.id) {
 		case "anthropic/claude-sonnet-4":
+		case "anthropic/claude-opus-4.1":
 		case "anthropic/claude-opus-4":
 		case "anthropic/claude-3.7-sonnet":
 		case "anthropic/claude-3.7-sonnet:beta":
@@ -117,6 +119,7 @@ export async function createOpenRouterStream(
 	let reasoning: { max_tokens: number } | undefined = undefined
 	switch (model.id) {
 		case "anthropic/claude-sonnet-4":
+		case "anthropic/claude-opus-4.1":
 		case "anthropic/claude-opus-4":
 		case "anthropic/claude-3.7-sonnet":
 		case "anthropic/claude-3.7-sonnet:beta":
@@ -143,6 +146,9 @@ export async function createOpenRouterStream(
 	const isKimiK2 = model.id === "moonshotai/kimi-k2"
 	openRouterProviderSorting = isKimiK2 ? undefined : openRouterProviderSorting
 
+	// Force 1m context window for Claude Sonnet 4
+	const isClaudeSonnet4 = model.id === "anthropic/claude-sonnet-4"
+
 	// @ts-ignore-next-line
 	const stream = await client.chat.completions.create({
 		model: model.id,
@@ -161,6 +167,8 @@ export async function createOpenRouterStream(
 		...(isKimiK2
 			? { provider: { order: ["groq", "together", "baseten", "parasail", "novita", "deepinfra"], allow_fallbacks: false } }
 			: {}),
+		// limit providers to only those that support the 1m context window
+		...(isClaudeSonnet4 ? { provider: { order: ["anthropic", "amazon-bedrock"], allow_fallbacks: false } } : {}),
 	})
 
 	return stream

@@ -14,7 +14,7 @@ interface VertexHandlerOptions {
 	thinkingBudgetTokens?: number
 	geminiApiKey?: string
 	geminiBaseUrl?: string
-	taskId?: string
+	ulid?: string
 	vertexBaseUrl?: string
 	vertexCredentialsPath?: string
 }
@@ -56,6 +56,11 @@ export class VertexHandler implements ApiHandler {
 			}
 			if (!this.options.vertexRegion) {
 				throw new Error("Vertex AI region is required")
+			}
+			// 如果提供了凭证路径，则设置环境变量
+			// 注意：这应该在客户端初始化之前完成
+			if (this.options.vertexCredentialsPath) {
+				process.env.GOOGLE_APPLICATION_CREDENTIALS = this.options.vertexCredentialsPath
 			}
 			try {
 				// Initialize Anthropic client for Claude models
@@ -101,6 +106,7 @@ export class VertexHandler implements ApiHandler {
 
 		switch (modelId) {
 			case "claude-sonnet-4@20250514":
+			case "claude-opus-4-1@20250805":
 			case "claude-opus-4@20250514":
 			case "claude-3-7-sonnet@20250219":
 			case "claude-3-5-sonnet-v2@20241022":

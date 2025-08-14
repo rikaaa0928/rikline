@@ -4,7 +4,7 @@ import styled from "styled-components"
 import { BROWSER_VIEWPORT_PRESETS } from "../../../../../src/shared/BrowserSettings"
 import { useExtensionState } from "../../../context/ExtensionStateContext"
 import { BrowserServiceClient } from "../../../services/grpc-client"
-import { EmptyRequest, StringRequest } from "@shared/proto/common"
+import { EmptyRequest, StringRequest } from "@shared/proto/cline/common"
 import { updateBrowserSetting } from "../utils/settingsHandlers"
 import { DebouncedTextField } from "../common/DebouncedTextField"
 import Section from "../Section"
@@ -143,8 +143,8 @@ export const BrowserSettingsSection: React.FC<BrowserSettingsSectionProps> = ({ 
 		BrowserServiceClient.relaunchChromeDebugMode(EmptyRequest.create({}))
 			.then((result) => {
 				setRelaunchResult({
-					success: result.success,
-					message: result.message,
+					success: true,
+					message: result.value,
 				})
 				setDebugMode(false)
 			})
@@ -331,7 +331,7 @@ export const BrowserSettingsSection: React.FC<BrowserSettingsSectionProps> = ({ 
 									initialValue={browserSettings.chromeExecutablePath || ""}
 									placeholder="e.g., /usr/bin/google-chrome or C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
 									style={{ width: "100%" }}
-									onChange={(value) => updateBrowserSetting("chromeExecutablePath", value || undefined)}
+									onChange={(value) => updateBrowserSetting("chromeExecutablePath", value)}
 								/>
 								<p
 									style={{
@@ -340,6 +340,29 @@ export const BrowserSettingsSection: React.FC<BrowserSettingsSectionProps> = ({ 
 										margin: "4px 0 0 0",
 									}}>
 									Leave blank to auto-detect.
+								</p>
+							</div>
+							{/* Custom Browser Arguments section */}
+							<div style={{ marginBottom: 8, marginTop: 8 }}>
+								<label
+									htmlFor="custom-browser-args"
+									style={{ fontWeight: "500", display: "block", marginBottom: 5 }}>
+									Custom Browser Arguments (Optional)
+								</label>
+								<DebouncedTextField
+									id="custom-browser-args"
+									initialValue={browserSettings.customArgs || ""}
+									placeholder="e.g., --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run --no-zygote"
+									style={{ width: "100%" }}
+									onChange={(value) => updateBrowserSetting("customArgs", value)}
+								/>
+								<p
+									style={{
+										fontSize: "12px",
+										color: "var(--vscode-descriptionForeground)",
+										margin: "4px 0 0 0",
+									}}>
+									Space-separated arguments to pass to the browser executable.
 								</p>
 							</div>
 						</div>

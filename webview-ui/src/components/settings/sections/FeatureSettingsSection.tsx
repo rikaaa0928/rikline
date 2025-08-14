@@ -1,9 +1,8 @@
-import { VSCodeCheckbox, VSCodeDropdown, VSCodeOption } from "@vscode/webview-ui-toolkit/react"
+import { VSCodeCheckbox, VSCodeDropdown, VSCodeOption, VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
 import { useExtensionState } from "@/context/ExtensionStateContext"
 import { memo } from "react"
-import { OpenAIReasoningEffort } from "@shared/ChatSettings"
+import { OpenaiReasoningEffort } from "@shared/storage/types"
 import { updateSetting } from "../utils/settingsHandlers"
-import { convertChatSettingsToProtoChatSettings } from "@shared/proto-conversions/state/chat-settings-conversion"
 import { McpDisplayMode } from "@shared/McpDisplayMode"
 import McpDisplayModeDropdown from "@/components/mcp/chat-display/McpDisplayModeDropdown"
 import Section from "../Section"
@@ -13,19 +12,19 @@ interface FeatureSettingsSectionProps {
 }
 
 const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionProps) => {
-	const { enableCheckpointsSetting, mcpMarketplaceEnabled, mcpDisplayMode, mcpResponsesCollapsed, chatSettings } =
-		useExtensionState()
+	const {
+		enableCheckpointsSetting,
+		mcpMarketplaceEnabled,
+		mcpDisplayMode,
+		mcpResponsesCollapsed,
+		openaiReasoningEffort,
+		strictPlanModeEnabled,
+		focusChainSettings,
+		focusChainFeatureFlagEnabled,
+	} = useExtensionState()
 
-	const handleReasoningEffortChange = (newValue: OpenAIReasoningEffort) => {
-		if (!chatSettings) return
-
-		const updatedChatSettings = {
-			...chatSettings,
-			openAIReasoningEffort: newValue,
-		}
-
-		const protoChatSettings = convertChatSettingsToProtoChatSettings(updatedChatSettings)
-		updateSetting("chatSettings", protoChatSettings)
+	const handleReasoningEffortChange = (newValue: OpenaiReasoningEffort) => {
+		updateSetting("openaiReasoningEffort", newValue)
 	}
 
 	return (
@@ -98,9 +97,9 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 						</label>
 						<VSCodeDropdown
 							id="openai-reasoning-effort-dropdown"
-							currentValue={chatSettings.openAIReasoningEffort || "medium"}
+							currentValue={openaiReasoningEffort || "medium"}
 							onChange={(e: any) => {
-								const newValue = e.target.currentValue as OpenAIReasoningEffort
+								const newValue = e.target.currentValue as OpenaiReasoningEffort
 								handleReasoningEffortChange(newValue)
 							}}
 							className="w-full">
@@ -112,6 +111,62 @@ const FeatureSettingsSection = ({ renderSectionHeader }: FeatureSettingsSectionP
 							Reasoning effort for the OpenAI family of models(applies to all OpenAI model providers)
 						</p>
 					</div>
+					<div style={{ marginTop: 10 }}>
+						<VSCodeCheckbox
+							checked={strictPlanModeEnabled}
+							onChange={(e: any) => {
+								const checked = e.target.checked === true
+								updateSetting("strictPlanModeEnabled", checked)
+							}}>
+							Enable strict plan mode
+						</VSCodeCheckbox>
+						<p className="text-xs text-[var(--vscode-descriptionForeground)]">
+							Enforces strict tool use while in plan mode, preventing file edits.
+						</p>
+					</div>
+					{focusChainFeatureFlagEnabled && (
+						<div style={{ marginTop: 10 }}>
+							<VSCodeCheckbox
+								checked={focusChainSettings?.enabled || false}
+								onChange={(e: any) => {
+									const checked = e.target.checked === true
+									updateSetting("focusChainSettings", { ...focusChainSettings, enabled: checked })
+								}}>
+								Enable Focus Chain
+							</VSCodeCheckbox>
+							<p className="text-xs text-[var(--vscode-descriptionForeground)]">
+								Enables enhanced task progress tracking and automatic focus chain list management throughout
+								tasks.
+							</p>
+						</div>
+					)}
+					{focusChainFeatureFlagEnabled && focusChainSettings?.enabled && (
+						<div style={{ marginTop: 10, marginLeft: 20 }}>
+							<label
+								htmlFor="focus-chain-remind-interval"
+								className="block text-sm font-medium text-[var(--vscode-foreground)] mb-1">
+								Focus Chain Reminder Interval
+							</label>
+							<VSCodeTextField
+								id="focus-chain-remind-interval"
+								value={String(focusChainSettings?.remindClineInterval || 6)}
+								onChange={(e: any) => {
+									const value = parseInt(e.target.value, 10)
+									if (!isNaN(value) && value >= 1 && value <= 100) {
+										updateSetting("focusChainSettings", {
+											...focusChainSettings,
+											remindClineInterval: value,
+										})
+									}
+								}}
+								className="w-20"
+							/>
+							<p className="text-xs mt-[5px] text-[var(--vscode-descriptionForeground)]">
+								Interval (in messages) to remind Cline about it's focus chain checklist (1-100). Lower values
+								provide more frequent reminders.
+							</p>
+						</div>
+					)}
 				</div>
 			</Section>
 		</div>
